@@ -3,21 +3,18 @@
 
 #include "rcTree.hpp"
 
-struct nothing {} nothing_v;
-nothing aggregate_nothing(nothing const &a, nothing const &b) {
-	return nothing_v;
-}
+struct nothing {};
 
 void real_assert(std::string const &msg, bool value) {
 	if (!value) throw msg;
 }
 
 void testConnectivity() {
-	rc_forest_builder<nothing, nothing> builder(aggregate_nothing, aggregate_nothing);
+	rc_forest_builder<nothing, nothing> builder;
 
 	const int SIZE = 6;
 	for (int i = 0; i < SIZE; ++i) {
-		builder.add_vertex(nothing_v);
+		builder.add_vertex();
 	}
 
 	bool checkup[SIZE][SIZE];
@@ -27,9 +24,9 @@ void testConnectivity() {
 		}
 	}
 
-	builder.add_edge(0, 5, nothing_v); checkup[0][5] = checkup[5][0] = true;
-	builder.add_edge(4, 5, nothing_v); checkup[4][5] = checkup[5][4] = true;
-	builder.add_edge(2, 3, nothing_v); checkup[2][3] = checkup[3][2] = true;
+	builder.add_edge(0, 5); checkup[0][5] = checkup[5][0] = true;
+	builder.add_edge(4, 5); checkup[4][5] = checkup[5][4] = true;
+	builder.add_edge(2, 3); checkup[2][3] = checkup[3][2] = true;
 
 	rc_forest<nothing, nothing> result = builder.build();
 
