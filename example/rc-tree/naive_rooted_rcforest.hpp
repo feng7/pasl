@@ -35,7 +35,7 @@ template<
             e_info_t         scheduled_e_info_down;
 
             int              mod_count;
-            mutable bool     used_bit;
+            bool             used_bit;
         };
 
         std::vector<vertex_t> vertices;
@@ -160,12 +160,12 @@ template<
 
         // Returns the monoid sum for the path from the first vertex to the last one.
         virtual e_info_t get_path(int v_first, int v_last) const {
-            e_info_t downwards_part = e_ops.neutral();
-            e_info_t upwards_part = e_ops.neutral();
-
             if (get_root(v_first) != get_root(v_last)) {
                 throw std::logic_error("[naive_rooted_rcforest::get_path] Vertices are not connected!");
             }
+
+            e_info_t downwards_part = e_ops.neutral();
+            e_info_t upwards_part = e_ops.neutral();
 
             int r_first = 0;
             for (int v_copy = v_first; !is_root(v_copy); ++r_first, v_copy = get_parent(v_copy));
@@ -195,15 +195,10 @@ template<
 
         // Returns the monoid sum for the vertices in the subtree of the given vertex.
         virtual v_info_t get_subtree(int vertex) const {
-            if (vertices.at(vertex).used_bit) {
-                throw std::logic_error("[naive_rooted_rcforest::get_subtree] Loops detected in the forest!");
-            }
-            vertices.at(vertex).used_bit = true;
             v_info_t rv = get_vertex_info(vertex);
             for (int i = 0, i_max = n_children(vertex); i < i_max; ++i) {
                 rv = v_ops.sum(rv, get_subtree(vertices.at(vertex).children.at(i)));
             }
-            vertices.at(vertex).used_bit = false;
             return rv;
         }
 
@@ -312,11 +307,11 @@ template<
         // Schedules (adds to the end of the current changelist)
         // the given vertex to be detached from its parent.
         virtual void scheduled_detach(int vertex) {
-            ensure_has_scheduled();
-            ensure_vertex_is_changed(vertex);
             if (scheduled_is_root(vertex)) {
                 throw std::invalid_argument("[naive_rooted_rcforest::scheduled_detach] The vertex is already a root!");
             }
+            ensure_has_scheduled();
+            ensure_vertex_is_changed(vertex);
             int parent = scheduled_get_parent(vertex);
             ensure_vertex_is_changed(parent);
 
@@ -328,19 +323,17 @@ template<
         // Schedules (adds to the end of the current changelist)
         // the given child vertex to be attached to the given parent vertex.
         virtual void scheduled_attach(int v_parent, int v_child, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
-            ensure_has_scheduled();
-            ensure_vertex_is_changed(v_parent);
-            ensure_vertex_is_changed(v_child);
             if (!scheduled_is_root(v_child)) {
                 throw std::invalid_argument("[naive_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
             }
-            int vp = v_parent;
-            while (!scheduled_is_root(vp)) {
+            for (int vp = v_parent; !scheduled_is_root(vp); vp = scheduled_get_parent(vp)) {
                 if (vp == v_child) {
                     throw std::invalid_argument("[naive_rooted_rcforest::scheduled_attach] The connection will make a loop!");
                 }
-                vp = scheduled_get_parent(vp);
             }
+            ensure_has_scheduled();
+            ensure_vertex_is_changed(v_parent);
+            ensure_vertex_is_changed(v_child);
             vertex_t &chv = vertices.at(v_child);
             chv.scheduled_parent = v_parent;
             chv.scheduled_e_info_up = edge_upwards;
