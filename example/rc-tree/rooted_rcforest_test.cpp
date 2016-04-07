@@ -48,10 +48,17 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(0, v0);
     int v1 = forest->create_vertex(52);
     ASSERT_EQUAL(1, v1);
+    int v2 = forest->create_vertex(46);
+    ASSERT_EQUAL(2, v2);
 
     // Single-vertex subtree queries
     ASSERT_EQUAL(20, forest->get_subtree(v0));
     ASSERT_EQUAL(52, forest->get_subtree(v1));
+
+    // root query for a tree
+    ASSERT_EQUAL(0, forest->get_root(v0));
+    ASSERT_EQUAL(1, forest->get_root(v1));
+    ASSERT_EQUAL(2, forest->get_root(v2));
 
     // Check if both are roots
     ASSERT_EQUAL(true, forest->is_root(v0));
@@ -62,6 +69,21 @@ void example_test(int_forest_gen new_forest) {
     // Check the children
     ASSERT_EQUAL(0, forest->n_children(v0));
     ASSERT_EQUAL(0, forest->n_children(v1));
+
+    // Check the roots,edges,vertices in the forest
+    ASSERT_EQUAL(3, forest->n_roots());
+    ASSERT_EQUAL(0, forest->n_edges());
+    ASSERT_EQUAL(3, forest->n_vertices());
+
+    // Check vertex info
+    ASSERT_EQUAL(20, forest->get_vertex_info(v0));
+    ASSERT_EQUAL(52, forest->get_vertex_info(v1));
+
+    // Check edge info connected with the vertex
+    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v0));
+    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v1));
+    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v0));
+    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v1));
 
     // Check if we don't have changes
     ASSERT_EQUAL(false, forest->scheduled_has_changes());
