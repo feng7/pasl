@@ -90,6 +90,21 @@ void example_test(int_forest_gen new_forest) {
 
     // Apply a change: v0 is now a parent of v1
     forest->scheduled_attach(v0, v1, 7, 4);
+    //forest->scheduled_detach(v0));
+    forest->scheduled_detach(v1);
+    forest->scheduled_attach(v0, v1, 7, 4);
+
+    // Check if we have changes
+    ASSERT_EQUAL(true, forest->scheduled_has_changes());
+
+    // Cancel changes
+    forest->scheduled_cancel();
+
+    // Check if we don't have changes
+    ASSERT_EQUAL(false, forest->scheduled_has_changes());
+
+    // Apply a change: v0 is now a parent of v1
+    forest->scheduled_attach(v0, v1, 7, 4);
 
     // Check if we have changes
     ASSERT_EQUAL(true, forest->scheduled_has_changes());
@@ -100,12 +115,60 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(v0, forest->get_parent(v0));
     ASSERT_EQUAL(v1, forest->get_parent(v1));
 
+    // Check their parent if the changes are applied
+    ASSERT_EQUAL(true, forest->scheduled_is_root(v0));
+    ASSERT_EQUAL(false, forest->scheduled_is_root(v1));
+    ASSERT_EQUAL(v0, forest->scheduled_get_parent(v0));
+    ASSERT_EQUAL(v0, forest->scheduled_get_parent(v1));
+
     // Check the children - should STILL be nothing
     ASSERT_EQUAL(0, forest->n_children(v0));
     ASSERT_EQUAL(0, forest->n_children(v1));
 
+    // Check the scheduled children if the changes are applied
+    ASSERT_EQUAL(1, forest->scheduled_n_children(v0));
+    ASSERT_EQUAL(0, forest->scheduled_n_children(v1));
+
+    // Check the roots,edges in the forest after changes before applied
+    ASSERT_EQUAL(3, forest->scheduled_n_roots());
+    ASSERT_EQUAL(0, forest->scheduled_n_edges());// should be 1 edge?
+
+    // Before applied, the vertex is marked as changed
+    ASSERT_EQUAL(true, forest->scheduled_is_changed(v0));
+    ASSERT_EQUAL(true, forest->scheduled_is_changed(v1));
+
+    // Set vertex info
+    forest->scheduled_set_vertex_info(v0,50);
+    forest->scheduled_set_vertex_info(v1,61);
+    ASSERT_EQUAL(20, forest->get_vertex_info(v0));
+    ASSERT_EQUAL(52, forest->get_vertex_info(v1));
+
+    // Set edges info
+    forest->scheduled_set_edge_info(v0,10,2);// Check its edge?
+    forest->scheduled_set_edge_info(v1,16,11);
+
+    // Check edge info connected with the vertex befoe changes applied
+    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v0));
+    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v1));
+    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v0));
+    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v1));
+
     // Apply changes
     forest->scheduled_apply();
+
+    // Check the set is applied
+    ASSERT_EQUAL(50, forest->get_vertex_info(v0));
+    ASSERT_EQUAL(61, forest->get_vertex_info(v1));
+
+    // After applied, the vertex is marked as not changed
+    ASSERT_EQUAL(false, forest->scheduled_is_changed(v0));
+    ASSERT_EQUAL(false, forest->scheduled_is_changed(v1));
+
+    // Check edge info connected with the vertex after applied
+    ASSERT_EQUAL(10, forest->get_edge_info_upwards(v0));
+    ASSERT_EQUAL(2, forest->get_edge_info_downwards(v0));
+    ASSERT_EQUAL(16, forest->get_edge_info_upwards(v1));
+    ASSERT_EQUAL(11, forest->get_edge_info_downwards(v1));
 
     // Check if we don't have changes
     ASSERT_EQUAL(false, forest->scheduled_has_changes());
@@ -116,13 +179,27 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(v0, forest->get_parent(v0));
     ASSERT_EQUAL(v0, forest->get_parent(v1));
 
+    // Check the roots,edges,vertices in the forest
+    ASSERT_EQUAL(3, forest->n_roots());
+    ASSERT_EQUAL(0, forest->n_edges());// should be 1 edge?
+
+    // Single-vertex subtree queries
+    ASSERT_EQUAL(111, forest->get_subtree(v0));// Subtree = 50+61
+    ASSERT_EQUAL(61, forest->get_subtree(v1));
+    ASSERT_EQUAL(46, forest->get_subtree(v2));
+
+    // root query for a tree
+    ASSERT_EQUAL(0, forest->get_root(v0));
+    ASSERT_EQUAL(0, forest->get_root(v1));
+    ASSERT_EQUAL(2, forest->get_root(v2));
+
     // Check the new children disposition
     ASSERT_EQUAL(1, forest->n_children(v0));
     ASSERT_EQUAL(0, forest->n_children(v1));
 
     // Check if the path is there and correct
-    ASSERT_EQUAL(7, forest->get_path(v1, v0));
-    ASSERT_EQUAL(4, forest->get_path(v0, v1));
+    ASSERT_EQUAL(16, forest->get_path(v1, v0));
+    ASSERT_EQUAL(11, forest->get_path(v0, v1));
 
     cout << "OK!" << endl;
 }
