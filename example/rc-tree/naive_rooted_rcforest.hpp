@@ -35,7 +35,6 @@ template<
             e_info_t         scheduled_e_info_down;
 
             int              mod_count;
-            bool             used_bit;
         };
 
         std::vector<vertex_t> vertices;
@@ -139,12 +138,18 @@ template<
         // Returns the upwards edge info for the edge
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_upwards(int vertex) const {
+            if (is_root(vertex)) {
+                throw std::invalid_argument("[naive_rooted_rcforest::get_edge_info_upwards]: The vertex is a root!");
+            }
             return vertices.at(vertex).e_info_up;
         }
 
         // Returns the downwards edge info for the edge
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_downwards(int vertex) const {
+            if (is_root(vertex)) {
+                throw std::invalid_argument("[naive_rooted_rcforest::get_edge_info_downwards]: The vertex is a root!");
+            }
             return vertices.at(vertex).e_info_down;
         }
 
@@ -218,7 +223,6 @@ template<
             back.scheduled_e_info_up = e_ops.neutral();
             back.scheduled_e_info_down = e_ops.neutral();
             back.mod_count = 0;
-            back.used_bit = false;
 
             vertices.push_back(back);
             return index;
@@ -298,6 +302,9 @@ template<
         // the change of edge information to the edge
         // going from the given vertex to its parent.
         virtual void scheduled_set_edge_info(int vertex, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
+            if (scheduled_is_root(vertex)) {
+                throw std::invalid_argument("[naive_rooted_rcforest::scheduled_set_edge_info] The vertex is a root!");
+            }
             ensure_has_scheduled();
             ensure_vertex_is_changed(vertex);
             vertices.at(vertex).scheduled_e_info_up   = edge_upwards;
@@ -318,6 +325,8 @@ template<
             std::vector<int> &child_list = vertices.at(parent).scheduled_children;
             child_list.erase(std::find(child_list.begin(), child_list.end(), vertex));
             vertices.at(vertex).scheduled_parent = vertex;
+
+            --scheduled_edge_count;
         }
 
         // Schedules (adds to the end of the current changelist)
@@ -326,9 +335,12 @@ template<
             if (!scheduled_is_root(v_child)) {
                 throw std::invalid_argument("[naive_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
             }
-            for (int vp = v_parent; !scheduled_is_root(vp); vp = scheduled_get_parent(vp)) {
+            for (int vp = v_parent; ; vp = scheduled_get_parent(vp)) {
                 if (vp == v_child) {
                     throw std::invalid_argument("[naive_rooted_rcforest::scheduled_attach] The connection will make a loop!");
+                }
+                if (scheduled_is_root(vp)) {
+                    break;
                 }
             }
             ensure_has_scheduled();
@@ -339,6 +351,8 @@ template<
             chv.scheduled_e_info_up = edge_upwards;
             chv.scheduled_e_info_down = edge_downwards;
             vertices.at(v_parent).scheduled_children.push_back(v_child);
+
+            ++scheduled_edge_count;
         }
 
         // Applies all pending changes.
@@ -353,12 +367,14 @@ template<
                     vx.e_info_down = vx.scheduled_e_info_down;
                 }
             }
+            edge_count = scheduled_edge_count;
             has_scheduled = false;
             ++mod_count;
         }
 
         // Cancels all pending changes.
         virtual void scheduled_cancel() {
+            scheduled_edge_count = edge_count;
             has_scheduled = false;
             ++mod_count;
         }

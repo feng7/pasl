@@ -39,6 +39,17 @@ void assert_equal_impl(int line, T const &expected, T const &found) {
 
 // just a couple of quotes for stupid Nano highlighting: ""
 
+#define ASSERT_THROWS(exc, expr) try {                                    \
+                                     expr;                                \
+                                     ostringstream oss;                   \
+                                     oss << "[Exception " << #exc         \
+                                         << " was not thrown in line "    \
+                                         << __LINE__ << "]" << endl;      \
+                                     throw std::runtime_error(oss.str()); \
+                                 } catch (exc &) {}                       \
+
+// just a couple of quotes for stupid Nano highlighting: ""
+
 void example_test(int_forest_gen new_forest) {
     cout << "    example_test... ";
     int_forest_ptr forest = new_forest();
@@ -80,10 +91,10 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(52, forest->get_vertex_info(v1));
 
     // Check edge info connected with the vertex
-    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v0));
-    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v1));
-    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v0));
-    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v1));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_upwards(v0));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_upwards(v1));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_downwards(v0));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_downwards(v1));
 
     // Check if we don't have changes
     ASSERT_EQUAL(false, forest->scheduled_has_changes());
@@ -94,11 +105,9 @@ void example_test(int_forest_gen new_forest) {
     forest->scheduled_detach(v1);
 
     // if the vertex is attached by itself, the edge info setting has no sense
-    forest->scheduled_attach(v1, v1, 7, 4);
-    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v1));
-    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v1));
+    ASSERT_THROWS(std::invalid_argument, forest->scheduled_attach(v1, v1, 7, 4));
     forest->scheduled_attach(v0, v1, 7, 4);
-    forest->scheduled_attach(v1, v0, 7, 4);// here gets no error?
+    ASSERT_THROWS(std::invalid_argument, forest->scheduled_attach(v1, v0, 7, 4));
 
     // Check if we have changes
     ASSERT_EQUAL(true, forest->scheduled_has_changes());
@@ -136,8 +145,8 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(0, forest->scheduled_n_children(v1));
 
     // Check the roots,edges in the forest after changes before applied
-    ASSERT_EQUAL(3, forest->scheduled_n_roots());
-    ASSERT_EQUAL(0, forest->scheduled_n_edges());// should be 1 edge?
+    ASSERT_EQUAL(2, forest->scheduled_n_roots());
+    ASSERT_EQUAL(1, forest->scheduled_n_edges());
 
     // Before applied, the vertex is marked as changed
     ASSERT_EQUAL(true, forest->scheduled_is_changed(v0));
@@ -150,14 +159,14 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(52, forest->get_vertex_info(v1));
 
     // Set edges info
-    forest->scheduled_set_edge_info(v0,10,2);// Check its edge?
-    forest->scheduled_set_edge_info(v1,16,11);
+    ASSERT_THROWS(std::invalid_argument, forest->scheduled_set_edge_info(v0, 10, 2));
+    forest->scheduled_set_edge_info(v1, 16, 11);
 
     // Check edge info connected with the vertex befoe changes applied
-    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v0));
-    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v1));
-    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v0));
-    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v1));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_upwards(v0));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_upwards(v1));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_downwards(v0));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_downwards(v1));
 
     // Apply changes
     forest->scheduled_apply();
@@ -171,8 +180,8 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(false, forest->scheduled_is_changed(v1));
 
     // Check edge info connected with the vertex after applied
-    ASSERT_EQUAL(10, forest->get_edge_info_upwards(v0));
-    ASSERT_EQUAL(2, forest->get_edge_info_downwards(v0));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_upwards(v0));
+    ASSERT_THROWS(std::invalid_argument, forest->get_edge_info_downwards(v0));
     ASSERT_EQUAL(16, forest->get_edge_info_upwards(v1));
     ASSERT_EQUAL(11, forest->get_edge_info_downwards(v1));
 
@@ -186,8 +195,8 @@ void example_test(int_forest_gen new_forest) {
     ASSERT_EQUAL(v0, forest->get_parent(v1));
 
     // Check the roots,edges,vertices in the forest
-    ASSERT_EQUAL(3, forest->n_roots());
-    ASSERT_EQUAL(0, forest->n_edges());// should be 1 edge?
+    ASSERT_EQUAL(2, forest->n_roots());
+    ASSERT_EQUAL(1, forest->n_edges());
 
     // Single-vertex subtree queries
     ASSERT_EQUAL(111, forest->get_subtree(v0));// Subtree = 50+61
