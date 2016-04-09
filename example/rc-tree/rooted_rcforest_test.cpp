@@ -92,7 +92,13 @@ void example_test(int_forest_gen new_forest) {
     forest->scheduled_attach(v0, v1, 7, 4);
     //forest->scheduled_detach(v0));
     forest->scheduled_detach(v1);
+
+    // if the vertex is attached by itself, the edge info setting has no sense
+    forest->scheduled_attach(v1, v1, 7, 4);
+    ASSERT_EQUAL(0, forest->get_edge_info_upwards(v1));
+    ASSERT_EQUAL(0, forest->get_edge_info_downwards(v1));
     forest->scheduled_attach(v0, v1, 7, 4);
+    forest->scheduled_attach(v1, v0, 7, 4);// here gets no error?
 
     // Check if we have changes
     ASSERT_EQUAL(true, forest->scheduled_has_changes());
