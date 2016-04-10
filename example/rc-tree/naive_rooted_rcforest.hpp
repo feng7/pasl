@@ -228,6 +228,7 @@ template<
             return index;
         }
 
+    // Scheduled modification helpers.
     private:
         void ensure_has_scheduled() {
             if (!has_scheduled) {
