@@ -219,6 +219,140 @@ void example_test(int_forest_gen new_forest) {
     cout << "OK!" << endl;
 }
 
+struct matrix {
+  int aa, ab, ba, bb;
+
+  matrix() : aa(1), ab(0), ba(0), bb(1) {}   // constructs an identity matrix
+
+  matrix(int aa, int ab, int ba, int bb) : aa(aa), ab(ab), ba(ba), bb(bb) {}  // constructs a given matrix
+
+  matrix operator + (matrix right) const {
+     return matrix(
+        aa * right.aa + ab * right.ba,
+        aa * right.ab + ab * right.bb,
+        ba * right.aa + bb * right.ba,
+        ba * right.ab + bb * right.bb
+     );
+  }
+  bool operator ==(matrix &right) const {
+     if(
+        aa == right.aa && ab == right.ba&&
+        ba == right.ba && bb == right.bb)return true;
+        else return false;
+  }
+  bool operator != (matrix right) const {
+     if(aa != right.aa || ab != right.ab ||
+        ba != right.ba || bb != right.bb)return true;
+        else return false;
+  }
+};
+
+using matrix_forest     = rooted_rcforest<matrix,matrix>;
+using matrix_forest_ptr = shared_ptr<matrix_forest>;
+using matrix_forest_gen = function<matrix_forest_ptr()>;
+
+
+void assert_matrix_equal_impl(int line, matrix const &expected, matrix const &found) {
+    if (expected != found) {
+        ostringstream oss;
+        oss << "Assertion failed at line " << line << ": expected ["
+        << expected.aa <<", "<< expected.ab <<"; "<< expected.ba <<", "<< expected.bb<<"]"
+        << " found [" << found.aa <<", "<< found.ab<<"; " << found.ba <<", "<< found.bb<<"]";
+        throw std::logic_error(oss.str());
+    }
+}
+
+#define ASSERT_MATRIX_EQUAL(a, b) try {                                        \
+                               assert_matrix_equal_impl(__LINE__, a, b);       \
+                           } catch (std::exception &ex) {               \
+                               ostringstream oss;                       \
+                               oss << "[Exception in line " << __LINE__ \
+                                   << "]: " << ex.what();               \
+                               throw std::runtime_error(oss.str());     \
+                             }
+
+void matrix_test(matrix_forest_gen new_forest) {
+    cout << "    matrix_test... ";
+    matrix_forest_ptr forest = new_forest();
+
+    // Create two vertices
+    matrix a0(1,2,3,4),a1(5,6,7,8),a2(9,8,7,6);
+    matrix b0(1,3,5,7),b1(2,4,6,8),b2(1,2,5,7),b3(2,4,7,8),b4(3,5,2,6);
+    int v0 = forest->create_vertex(a0);
+    int v1 = forest->create_vertex(a1);
+    int v2 = forest->create_vertex(a2);
+    int v3 = forest->create_vertex(b0);
+    int v4 = forest->create_vertex(b1);
+    int v5 = forest->create_vertex(b2);
+    int v6 = forest->create_vertex(b3);
+    int v7 = forest->create_vertex(b4);
+
+    matrix eup(1,2,3,4),edo(5,6,7,8);
+    // Build simple trees
+    //       v0
+    //      /  |
+    //    v1   v2
+    forest->scheduled_attach(v0, v1, eup, edo);
+    forest->scheduled_attach(v0, v2, eup, edo);
+
+    //        v3
+    //       /  |
+    //     v4   v5
+    //    /  |
+    //   v6  v7
+    forest->scheduled_attach(v3, v4, eup, edo);
+    forest->scheduled_attach(v3, v5, eup, edo);
+    forest->scheduled_attach(v4, v6, eup, edo);
+    forest->scheduled_attach(v4, v7, eup, edo);
+
+    // Apply the changes
+    forest->scheduled_apply();
+
+    ASSERT_MATRIX_EQUAL(edo, forest->get_path(v0, v1));
+    ASSERT_MATRIX_EQUAL(eup, forest->get_path(v1, v0));
+    ASSERT_MATRIX_EQUAL(edo+edo, forest->get_path(v3, v7));
+
+    // Connect two trees
+    //             v0
+    //            /  |
+    //          v1   v2
+    //          /
+    //        v3
+    //       /  |
+    //     v4   v5
+    //    /  |
+    //   v6  v7
+    matrix up_info(11,22,33,44),down_info(55,66,77,88);
+    forest->scheduled_attach(v1, v3, up_info, down_info);
+    // Apply the changes
+    forest->scheduled_apply();
+    ASSERT_MATRIX_EQUAL(eup+edo+down_info+edo, forest->get_path(v2, v5));
+    ASSERT_MATRIX_EQUAL(eup+up_info+eup+edo, forest->get_path(v5, v2));
+
+    // Connect two trees
+    //             v0
+    //            /  |
+    //          v1   v2
+    //          /
+    //        v3
+    //          |
+    //          v5
+    //     v4
+    //    /  |
+    //   v6  v7
+    forest->scheduled_detach(v4);
+    // Apply the changes
+    forest->scheduled_apply();
+    ASSERT_THROWS(std::logic_error, forest->get_path(v5, v6));
+
+    cout << "OK!" << endl;
+}
+
+void test_matrix(string const &name, matrix_forest_gen new_forest) {
+    cout << "Testing " << name << "..." << endl;
+    matrix_test(new_forest);
+}
+
 void test_everything(string const &name, int_forest_gen new_forest) {
     cout << "Testing " << name << "..." << endl;
     example_test(new_forest);
@@ -226,5 +360,6 @@ void test_everything(string const &name, int_forest_gen new_forest) {
 
 int main() {
     test_everything("naive forest", []() -> shared_ptr<int_forest> { return shared_ptr<int_forest>(new naive_rooted_rcforest<int, int>()); });
+    test_matrix("naive forest with matrix info", []() -> shared_ptr<matrix_forest> { return shared_ptr<matrix_forest>(new naive_rooted_rcforest<matrix, matrix>()); });
     return 0;
 }
