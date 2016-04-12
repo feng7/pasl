@@ -11,11 +11,13 @@
 #include <vector>
 
 #include "rooted_rcforest.hpp"
+#include "dc/dynamic_connectivity.hpp"
 
 // A sequential implementation of the rooted RC-forest.
 template<
     typename e_info_t,
     typename v_info_t,
+    typename connectivity_t = link_cut_tree,         // use "dummy_checker" to turn off control and make it faster
     typename e_monoid_trait = monoid_plus<e_info_t>, // may be non-commutative
     typename v_monoid_trait = monoid_plus<v_info_t>, // should be commutative
     typename random_t       = std::default_random_engine
@@ -75,12 +77,14 @@ template<
 
         random_t rng;
 
+        connectivity_t conn_checker;
+
     // Constructors
     public:
         sequential_rooted_rcforest(
+            unsigned seed = (unsigned) (std::chrono::system_clock::now().time_since_epoch().count()),
             e_monoid_trait const &e_ops = e_monoid_trait(),
-            v_monoid_trait const &v_ops = v_monoid_trait(),
-            unsigned seed = (unsigned) (std::chrono::system_clock::now().time_since_epoch().count())
+            v_monoid_trait const &v_ops = v_monoid_trait()
         ) : e_ops(e_ops)
           , v_ops(v_ops)
           , edge_count(0)
@@ -89,6 +93,7 @@ template<
           , vertices()
           , changed_vertices()
           , rng(seed)
+          , conn_checker()
         {}
 
         sequential_rooted_rcforest(
@@ -101,6 +106,7 @@ template<
           , vertices(src.vertices)
           , changed_vertices(src.changed_vertices)
           , rng(src.rng)
+          , conn_checker(src.conn_checker)
         {}
 
         sequential_rooted_rcforest &operator = (
@@ -114,6 +120,7 @@ template<
             vertices             = src.vertices;
             changed_vertices     = src.changed_vertices;
             rng                  = src.rng;
+            conn_checker         = src.conn_checker;
             return *this;
         }
 
@@ -128,6 +135,7 @@ template<
             vertices             = src.vertices;
             changed_vertices     = src.changed_vertices;
             rng                  = src.rng;
+            conn_checker         = src.conn_checker;
             return *this;
         }
 
@@ -268,6 +276,8 @@ template<
         void ensure_has_scheduled() {
             if (!has_scheduled) {
                 has_scheduled = true;
+                scheduled_edge_count = edge_count;
+                scheduled_conn_checker = conn_checker;
             }
         }
 
@@ -436,6 +446,7 @@ template<
             ensure_vertex_is_changed(parent);
 
             cartesian_delete(2 * parent, 2 * vertex + 1);
+            scheduled_conn_checker.cut(parent, vertex);
 
             --vertices[2 * parent].scheduled_children_count;
             --scheduled_edge_count;
@@ -448,7 +459,9 @@ template<
                 throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
             }
 
-            // TODO: how to check if v_parent is not a child of v_child (scheduled_*, of course)?
+            if (scheduled_conn_checker.test_connectivity(v_parent, v_child)) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_attach] The parent and the child are already connected!");
+            }
 
             ensure_has_scheduled();
             ensure_vertex_is_changed(v_parent);
@@ -461,6 +474,7 @@ template<
             col_child_data.changes.e_info_down = edge_downwards;
 
             cartesian_insert(2 * v_parent, 2 * v_child + 1);
+            scheduled_conn_checker.link(v_parent, v_child);
 
             ++vertices[2 * v_parent].scheduled_children_count;
             ++scheduled_edge_count;
@@ -470,12 +484,14 @@ template<
         virtual void scheduled_apply() {
             // TODO: the main stuff
             edge_count = scheduled_edge_count;
+            conn_checker.flush();
             has_scheduled = false;
         }
 
         // Cancels all pending changes.
         virtual void scheduled_cancel() {
             scheduled_edge_count = edge_count;
+            conn_checker.unroll();
             has_scheduled = false;
             changed_vertices.clear();
         }

@@ -34,14 +34,13 @@ template<
             e_info_t         scheduled_e_info_up;
             e_info_t         scheduled_e_info_down;
 
-            int              mod_count;
+            bool             changed;
         };
 
         std::vector<vertex_t> vertices;
 
         int  edge_count;
         int  scheduled_edge_count;
-        int  mod_count;
         bool has_scheduled;
 
         e_monoid_trait  e_ops;
@@ -55,7 +54,6 @@ template<
         ) : vertices()
           , edge_count(0)
           , scheduled_edge_count(0)
-          , mod_count(1)    // we start with 1 such that all vertices are unchanged
           , has_scheduled(false)
           , e_ops(e_ops)
           , v_ops(v_ops)
@@ -66,7 +64,6 @@ template<
         ) : vertices(src.vertices)
           , edge_count(src.edge_count)
           , scheduled_edge_count(src.scheduled_edge_count)
-          , mod_count(src.mod_count)
           , has_scheduled(false)
           , e_ops(src.e_ops)
           , v_ops(src.v_ops)
@@ -78,7 +75,6 @@ template<
             vertices             = src.vertices;
             edge_count           = src.edge_count;
             scheduled_edge_count = src.scheduled_edge_count;
-            mod_count            = src.mod_count;
             has_scheduled        = src.has_scheduled;
             e_ops                = src.e_ops;
             v_ops                = src.v_ops;
@@ -91,7 +87,6 @@ template<
             vertices             = src.vertices;
             edge_count           = src.edge_count;
             scheduled_edge_count = src.scheduled_edge_count;
-            mod_count            = src.mod_count;
             has_scheduled        = src.has_scheduled;
             e_ops                = src.e_ops;
             v_ops                = src.v_ops;
@@ -172,22 +167,28 @@ template<
             e_info_t downwards_part = e_ops.neutral();
             e_info_t upwards_part = e_ops.neutral();
 
+            // r_first should be the distance from v_first to its parent
             int r_first = 0;
             for (int v_copy = v_first; !is_root(v_copy); ++r_first, v_copy = get_parent(v_copy));
 
+            // r_last should be the distance from v_last to its parent
             int r_last = 0;
             for (int v_copy = v_last;  !is_root(v_copy); ++r_last,  v_copy = get_parent(v_copy));
 
+            // First, we make distances from v_first and from v_last to their parent equal
+            // Not r_first > 0 because we don't necessary go all the way to the root
             while (r_first > r_last) {
                 upwards_part = e_ops.sum(upwards_part, get_edge_info_upwards(v_first));
                 v_first = get_parent(v_first);
                 --r_first;
             }
+            // Not r_last > 0 because we don't necessary go all the way to the root
             while (r_last > r_first) {
                 downwards_part = e_ops.sum(get_edge_info_downwards(v_last), downwards_part);
                 v_last = get_parent(v_last);
                 --r_last;
             }
+            // Then we go upwards until the vertices meet
             while (v_first != v_last) {
                 upwards_part = e_ops.sum(upwards_part, get_edge_info_upwards(v_first));
                 v_first = get_parent(v_first);
@@ -222,7 +223,7 @@ template<
             back.scheduled_v_info = vertex_info;
             back.scheduled_e_info_up = e_ops.neutral();
             back.scheduled_e_info_down = e_ops.neutral();
-            back.mod_count = 0;
+            back.changed = false;
 
             vertices.push_back(back);
             return index;
@@ -238,8 +239,8 @@ template<
 
         void ensure_vertex_is_changed(int vertex) {
             vertex_t &vx = vertices.at(vertex);
-            if (mod_count != vx.mod_count) {
-                vx.mod_count = mod_count;
+            if (!vx.changed) {
+                vx.changed = true;
                 vx.scheduled_parent      = vx.parent;
                 vx.scheduled_children    = vx.children;
                 vx.scheduled_v_info      = vx.v_info;
@@ -252,7 +253,7 @@ template<
     public:
         // Tests if a vertex has changed.
         virtual bool scheduled_is_changed(int vertex) const {
-            return mod_count == vertices.at(vertex).mod_count;
+            return vertices.at(vertex).changed;
         }
 
         // Returns the parent of the given vertex after all scheduled changes are applied.
@@ -360,24 +361,26 @@ template<
         virtual void scheduled_apply() {
             for (int i = 0, i_max = n_vertices(); i < i_max; ++i) {
                 vertex_t &vx = vertices.at(i);
-                if (vx.mod_count == mod_count) {
+                if (vx.changed) {
                     vx.parent      = vx.scheduled_parent;
                     vx.children    = vx.scheduled_children;
                     vx.v_info      = vx.scheduled_v_info;
                     vx.e_info_up   = vx.scheduled_e_info_up;
                     vx.e_info_down = vx.scheduled_e_info_down;
+                    vx.changed     = false;
                 }
             }
             edge_count = scheduled_edge_count;
             has_scheduled = false;
-            ++mod_count;
         }
 
         // Cancels all pending changes.
         virtual void scheduled_cancel() {
+            for (int i = 0, i_max = n_vertices(); i < i_max; ++i) {
+                vertices.at(i).changed = false;
+            }
             scheduled_edge_count = edge_count;
             has_scheduled = false;
-            ++mod_count;
         }
 
     // A necessary virtual destructor
