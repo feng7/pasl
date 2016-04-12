@@ -247,45 +247,27 @@ struct matrix {
   }
 };
 
-using matrix_forest     = rooted_rcforest<matrix,matrix>;
-using matrix_forest_ptr = shared_ptr<matrix_forest>;
-using matrix_forest_gen = function<matrix_forest_ptr()>;
-
-
-void assert_matrix_equal_impl(int line, matrix const &expected, matrix const &found) {
-    if (expected != found) {
-        ostringstream oss;
-        oss << "Assertion failed at line " << line << ": expected ["
-        << expected.aa <<", "<< expected.ab <<"; "<< expected.ba <<", "<< expected.bb<<"]"
-        << " found [" << found.aa <<", "<< found.ab<<"; " << found.ba <<", "<< found.bb<<"]";
-        throw std::logic_error(oss.str());
-    }
+std::ostream &operator << (std::ostream &out, matrix const &m) {
+    return out << "[" << m.aa << ", " << m.ab << ", " << m.ba << ", " << m.bb << "]";
 }
 
-#define ASSERT_MATRIX_EQUAL(a, b) try {                                        \
-                               assert_matrix_equal_impl(__LINE__, a, b);       \
-                           } catch (std::exception &ex) {               \
-                               ostringstream oss;                       \
-                               oss << "[Exception in line " << __LINE__ \
-                                   << "]: " << ex.what();               \
-                               throw std::runtime_error(oss.str());     \
-                             }
+using matrix_forest     = rooted_rcforest<matrix,int>;
+using matrix_forest_ptr = shared_ptr<matrix_forest>;
+using matrix_forest_gen = function<matrix_forest_ptr()>;
 
 void matrix_test(matrix_forest_gen new_forest) {
     cout << "    matrix_test... ";
     matrix_forest_ptr forest = new_forest();
 
     // Create two vertices
-    matrix a0(1,2,3,4),a1(5,6,7,8),a2(9,8,7,6);
-    matrix b0(1,3,5,7),b1(2,4,6,8),b2(1,2,5,7),b3(2,4,7,8),b4(3,5,2,6);
-    int v0 = forest->create_vertex(a0);
-    int v1 = forest->create_vertex(a1);
-    int v2 = forest->create_vertex(a2);
-    int v3 = forest->create_vertex(b0);
-    int v4 = forest->create_vertex(b1);
-    int v5 = forest->create_vertex(b2);
-    int v6 = forest->create_vertex(b3);
-    int v7 = forest->create_vertex(b4);
+    int v0 = forest->create_vertex(0);
+    int v1 = forest->create_vertex(1);
+    int v2 = forest->create_vertex(2);
+    int v3 = forest->create_vertex(0);
+    int v4 = forest->create_vertex(1);
+    int v5 = forest->create_vertex(2);
+    int v6 = forest->create_vertex(3);
+    int v7 = forest->create_vertex(4);
 
     matrix eup(1,2,3,4),edo(5,6,7,8);
     // Build simple trees
@@ -308,9 +290,9 @@ void matrix_test(matrix_forest_gen new_forest) {
     // Apply the changes
     forest->scheduled_apply();
 
-    ASSERT_MATRIX_EQUAL(edo, forest->get_path(v0, v1));
-    ASSERT_MATRIX_EQUAL(eup, forest->get_path(v1, v0));
-    ASSERT_MATRIX_EQUAL(edo+edo, forest->get_path(v3, v7));
+    ASSERT_EQUAL(edo, forest->get_path(v0, v1));
+    ASSERT_EQUAL(eup, forest->get_path(v1, v0));
+    ASSERT_EQUAL(edo+edo, forest->get_path(v3, v7));
 
     // Connect two trees
     //             v0
@@ -326,8 +308,8 @@ void matrix_test(matrix_forest_gen new_forest) {
     forest->scheduled_attach(v1, v3, up_info, down_info);
     // Apply the changes
     forest->scheduled_apply();
-    ASSERT_MATRIX_EQUAL(eup+edo+down_info+edo, forest->get_path(v2, v5));
-    ASSERT_MATRIX_EQUAL(eup+up_info+eup+edo, forest->get_path(v5, v2));
+    ASSERT_EQUAL(eup+edo+down_info+edo, forest->get_path(v2, v5));
+    ASSERT_EQUAL(eup+up_info+eup+edo, forest->get_path(v5, v2));
 
     // Connect two trees
     //             v0
@@ -360,6 +342,6 @@ void test_everything(string const &name, int_forest_gen new_forest) {
 
 int main() {
     test_everything("naive forest", []() -> shared_ptr<int_forest> { return shared_ptr<int_forest>(new naive_rooted_rcforest<int, int>()); });
-    test_matrix("naive forest with matrix info", []() -> shared_ptr<matrix_forest> { return shared_ptr<matrix_forest>(new naive_rooted_rcforest<matrix, matrix>()); });
+    test_matrix("naive forest with matrix info", []() -> shared_ptr<matrix_forest> { return shared_ptr<matrix_forest>(new naive_rooted_rcforest<matrix, int>()); });
     return 0;
 }
