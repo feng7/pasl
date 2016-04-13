@@ -253,15 +253,11 @@ struct matrix {
      );
   }
   bool operator ==(matrix const &right) const {
-     if(
-        aa == right.aa && ab == right.ba&&
-        ba == right.ba && bb == right.bb)return true;
-        else return false;
+     return aa == right.aa && ab == right.ab && ba == right.ba && bb == right.bb;
   }
+
   bool operator != (matrix const &right) const {
-     if(aa != right.aa || ab != right.ab ||
-        ba != right.ba || bb != right.bb)return true;
-        else return false;
+     return aa != right.aa || ab != right.ab || ba != right.ba || bb != right.bb;
   }
 };
 
