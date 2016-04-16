@@ -273,7 +273,7 @@ void matrix_test(matrix_forest_gen new_forest) {
     cout << "    matrix_test... ";
     matrix_forest_ptr forest = new_forest();
 
-    // Create two vertices
+    // Create vertices of two trees
     int v0 = forest->create_vertex(0);
     int v1 = forest->create_vertex(1);
     int v2 = forest->create_vertex(2);
@@ -325,7 +325,7 @@ void matrix_test(matrix_forest_gen new_forest) {
     ASSERT_EQUAL(eup+edo+down_info+edo, forest->get_path(v2, v5));
     ASSERT_EQUAL(eup+up_info+eup+edo, forest->get_path(v5, v2));
 
-    // Connect two trees
+    // Split two trees
     //             v0
     //            /  |
     //          v1   v2
@@ -340,6 +340,81 @@ void matrix_test(matrix_forest_gen new_forest) {
     // Apply the changes
     ASSERT_NOTHROW(forest->scheduled_apply());
     ASSERT_THROWS(std::logic_error, forest->get_path(v5, v6));
+
+    // Create vertices of two big trees
+    // Vertices of first big tree
+    int v_t1[10000];
+    for(int i=0;i<10000;i++)
+    {
+      v_t1[i] = forest->create_vertex(i);
+    }
+    // Vertices of second big tree
+    int v_t2[100000];
+    for(int i=0;i<100000;i++)
+    {
+      v_t2[i] = forest->create_vertex(i);
+    }
+    // Build simple trees
+    for(int i=1;i<10000;i++)
+    {
+      ASSERT_NOTHROW(forest->scheduled_attach(v_t1[i-1], v_t1[i], eup, edo));
+    }
+    //         v_t1[0]
+    //        /      |
+    //   v_t1[1]   v_t1[4999]
+    //     |          |
+    //     Δ          Δ     subtrees
+    ASSERT_THROWS(std::logic_error, forest->scheduled_detach(v_t1[14999]));
+    ASSERT_NOTHROW(forest->scheduled_detach(v_t1[4999]));
+    ASSERT_NOTHROW(forest->scheduled_attach(v_t1[0], v_t1[4999], eup, edo));
+
+    for(int i=1;i<100000;i++)
+    {
+      ASSERT_NOTHROW(forest->scheduled_attach(v_t2[i-1], v_t2[i], eup, edo));
+    }
+    // Change the structure of second tree
+    //   v_t2[0]-v_t2[1000]- ...... -v_t2[1999]
+    //     |
+    //   v_t2[1]-v_t2[2000]- ...... -v_t2[2999]
+    //     |
+    //   ......................................
+    //     |
+    //   v_t2[98]-v_t2[99000]- ...... -v_t2[99999]
+    //     |
+    //    ...
+    //     |
+    //   v_t2[999]
+    for(int j=1;j<100;j++)
+    {
+      ASSERT_NOTHROW(forest->scheduled_detach(v_t2[1000*j]));
+      ASSERT_NOTHROW(forest->scheduled_attach(v_t2[j-1], v_t2[1000*j], eup, edo));
+    }
+
+    // Apply the changes
+    ASSERT_NOTHROW(forest->scheduled_apply());
+
+    /*
+    // Check the edge info
+    matrix edo3000(0,0,0,0),eup1002(0,0,0,0),eup3000_edo1002(0,0,0,0);
+    for(int i=0;i<3000;++i) edo3000 = edo3000+edo;
+    for(int i=0;i<1002;++i) eup1002 = eup1002+eup;
+    for(int i=0;i<3000;++i) eup3000_edo1002 = eup3000_edo1002+eup;
+    for(int i=0;i<1002;++i) eup3000_edo1002 = eup3000_edo1002+edo;
+    ASSERT_EQUAL(edo3000, forest->get_path(v_t1[0], v_t1[3000]));
+    ASSERT_EQUAL(eup1002, forest->get_path(v_t1[6000], v_t1[0]));
+    ASSERT_EQUAL(eup3000_edo1002, forest->get_path(v_t1[3000], v_t1[6000]));
+    */
+
+    // Connect two trees
+    ASSERT_NOTHROW(forest->scheduled_attach(v_t1[0], v_t2[0], up_info, down_info));
+    // Apply the changes
+    ASSERT_NOTHROW(forest->scheduled_apply());
+    //ASSERT_EQUAL(eup10_downinfo_edo502, forest->get_path(v_t1[10], v_t1[2500]));
+
+    ASSERT_NOTHROW(forest->scheduled_detach(v_t2[2600]));
+    // Apply the changes
+    ASSERT_NOTHROW(forest->scheduled_apply());
+    ASSERT_THROWS(std::logic_error, forest->get_path(v_t1[50], v_t2[2800]));
 
     cout << "OK!" << endl;
 }
