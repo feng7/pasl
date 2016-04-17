@@ -341,6 +341,13 @@ void matrix_test(matrix_forest_gen new_forest) {
     ASSERT_NOTHROW(forest->scheduled_apply());
     ASSERT_THROWS(std::logic_error, forest->get_path(v5, v6));
 
+    cout << "OK!" << endl;
+}
+
+void big_matrix_tree_test(matrix_forest_gen new_forest) {
+    cout << "    big_matrix_tree_test... ";
+    matrix_forest_ptr forest = new_forest();
+
     // Create vertices of two big trees
     // Vertices of first big tree
     int v_t1[10000];
@@ -348,17 +355,34 @@ void matrix_test(matrix_forest_gen new_forest) {
     {
       v_t1[i] = forest->create_vertex(i);
     }
+    ASSERT_EQUAL(6000, v_t1[6000]);
     // Vertices of second big tree
     int v_t2[100000];
     for(int i=0;i<100000;i++)
     {
       v_t2[i] = forest->create_vertex(i);
     }
+    ASSERT_EQUAL(16000, v_t2[6000]);
+
+    // Check the roots,edges,vertices in the forest
+    ASSERT_EQUAL(110000, forest->n_roots());
+    ASSERT_EQUAL(0, forest->n_edges());
+    ASSERT_EQUAL(110000, forest->n_vertices());
+
+    // Check if we don't have changes
+    ASSERT_EQUAL(false, forest->scheduled_has_changes());
+
     // Build simple trees
+    matrix eup(1,2,3,4),edo(5,6,7,8);
+
     for(int i=1;i<10000;i++)
     {
       ASSERT_NOTHROW(forest->scheduled_attach(v_t1[i-1], v_t1[i], eup, edo));
     }
+
+    // Check if we have changes
+    ASSERT_EQUAL(true, forest->scheduled_has_changes());
+
     //         v_t1[0]
     //        /      |
     //   v_t1[1]   v_t1[4999]
@@ -390,8 +414,27 @@ void matrix_test(matrix_forest_gen new_forest) {
       ASSERT_NOTHROW(forest->scheduled_attach(v_t2[j-1], v_t2[1000*j], eup, edo));
     }
 
-    // Apply the changes
+    // Check the roots,edges in the forest after changes before applied
+    ASSERT_EQUAL(2, forest->scheduled_n_roots());
+    ASSERT_EQUAL(9999+99999, forest->scheduled_n_edges());
+
+    // Check vertices if they are roots
+    ASSERT_EQUAL(true, forest->scheduled_is_root(v_t1[0]));
+    ASSERT_EQUAL(false, forest->scheduled_is_root(v_t1[1000]));
+
+    // Before applied, the vertex is marked as changed
+    ASSERT_EQUAL(true, forest->scheduled_is_changed(v_t1[0]));
+    ASSERT_EQUAL(true, forest->scheduled_is_changed(v_t2[1]));
+
+    // Set edges info
+    ASSERT_NOTHROW(forest->scheduled_set_edge_info(v_t2[1], eup, edo));
+
+    // Apply changes
     ASSERT_NOTHROW(forest->scheduled_apply());
+
+    // After applied, the vertex is marked as not changed
+    ASSERT_EQUAL(false, forest->scheduled_is_changed(v_t1[0]));
+    ASSERT_EQUAL(false, forest->scheduled_is_changed(v_t2[1]));
 
     /*
     // Check the edge info
@@ -405,11 +448,24 @@ void matrix_test(matrix_forest_gen new_forest) {
     ASSERT_EQUAL(eup3000_edo1002, forest->get_path(v_t1[3000], v_t1[6000]));
     */
 
+    matrix up_info(11,22,33,44),down_info(55,66,77,88);
     // Connect two trees
     ASSERT_NOTHROW(forest->scheduled_attach(v_t1[0], v_t2[0], up_info, down_info));
     // Apply the changes
     ASSERT_NOTHROW(forest->scheduled_apply());
     //ASSERT_EQUAL(eup10_downinfo_edo502, forest->get_path(v_t1[10], v_t1[2500]));
+
+    // Check the new root disposition
+    ASSERT_EQUAL(true, forest->is_root(v_t1[0]));
+    ASSERT_EQUAL(false, forest->is_root(v_t2[0]));
+
+    // Check the roots,edges,vertices in the forest
+    ASSERT_EQUAL(1, forest->n_roots());
+    ASSERT_EQUAL(109999, forest->n_edges());
+
+    // root query for a tree
+    ASSERT_EQUAL(0, forest->get_root(v_t1[0]));
+    ASSERT_EQUAL(0, forest->get_root(v_t2[0]));
 
     ASSERT_NOTHROW(forest->scheduled_detach(v_t2[2600]));
     // Apply the changes
@@ -422,6 +478,7 @@ void matrix_test(matrix_forest_gen new_forest) {
 void test_matrix(string const &name, matrix_forest_gen new_forest) {
     cout << "Testing " << name << "..." << endl;
     matrix_test(new_forest);
+    big_matrix_tree_test(new_forest);
 }
 
 void test_everything(string const &name, int_forest_gen new_forest) {
