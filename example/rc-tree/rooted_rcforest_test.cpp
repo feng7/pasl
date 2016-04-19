@@ -388,7 +388,7 @@ void big_matrix_tree_test(matrix_forest_gen new_forest) {
     //   v_t1[1]   v_t1[4999]
     //     |          |
     //     Δ          Δ     subtrees
-    ASSERT_THROWS(std::logic_error, forest->scheduled_detach(v_t1[14999]));
+    ASSERT_THROWS(std::logic_error, forest->scheduled_detach(712458743)); // there is no vertex 14999, putting random strange number
     ASSERT_NOTHROW(forest->scheduled_detach(v_t1[4999]));
     ASSERT_NOTHROW(forest->scheduled_attach(v_t1[0], v_t1[4999], eup, edo));
 

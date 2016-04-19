@@ -7,6 +7,12 @@ g++ -std=c++11 -O3 -Wall -Wextra -o test-dc \
 rm test-dc
 
 g++ -std=c++11 -O3 -Wall -Wextra -o main \
+   stress_test.cpp dc/dynamic_connectivity.cpp
+
+./main
+rm main
+
+g++ -std=c++11 -O3 -Wall -Wextra -o main \
    rooted_rcforest_test.cpp dc/dynamic_connectivity.cpp
 
 ./main
