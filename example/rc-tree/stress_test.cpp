@@ -126,7 +126,7 @@ void stress_testing(int max_vertices, int max_operations, int_forest_gen gen_ans
 
     int done_operations = 0;
     while (done_operations < max_operations) {
-        int now_operations = (int) (rng() % (std::min(max_operations - done_operations, 10))) + 1;
+        int now_operations = (int) (rng() % (std::min(max_operations - done_operations, max_vertices))) + 1;
         done_operations += now_operations;
         for (int i = 0; i < now_operations; ++i) {
             bool op_completed = false;
@@ -164,7 +164,7 @@ void stress_testing(int max_vertices, int max_operations, int_forest_gen gen_ans
                     }
                     case 2: { // attach
                         X_ASSERT_EQ(scheduled_n_roots(), "scheduled_n_roots()");
-                        if (tree_ans->scheduled_n_roots() > 0) {
+                        if (tree_ans->scheduled_n_roots() > 1) {
                             int v;
                             do {
                                 v = rng() % max_vertices;
@@ -240,10 +240,18 @@ int main() {
         return shared_ptr<int_forest>(new sequential_rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
     };
 
-    cout << "Starting naive vs naive..." << endl;;
-    stress_testing(10, 100, naive, naive);
-    cout << "  done!" << endl << "Starting naive vs sequential..." << endl;;
-    stress_testing(10, 100, naive, seq);
-    cout << "  done!" << endl;
+    cout << "6 vertices 100 operations" << endl;
+    cout << "  Starting naive vs naive..." << endl;
+    stress_testing(6, 100, naive, naive);
+    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
+    stress_testing(6, 100, naive, seq);
+    cout << "    done!" << endl;
+
+    cout << "10 vertices 200 operations" << endl;
+    cout << "  Starting naive vs naive..." << endl;
+    stress_testing(10, 200, naive, naive);
+    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
+    stress_testing(10, 200, naive, seq);
+    cout << "    done!" << endl;
     return 0;
 }
