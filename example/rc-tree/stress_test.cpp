@@ -253,5 +253,12 @@ int main() {
     cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
     stress_testing(10, 200, naive, seq);
     cout << "    done!" << endl;
+
+    cout << "10 vertices 10000 operations" << endl;
+    cout << "  Starting naive vs naive..." << endl;
+    stress_testing(10, 10000, naive, naive);
+    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
+    stress_testing(10, 10000, naive, seq);
+    cout << "    done!" << endl;
     return 0;
 }
