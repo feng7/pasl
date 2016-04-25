@@ -22,7 +22,7 @@ template<
     typename e_monoid_trait = monoid_plus<e_info_t>, // may be non-commutative
     typename v_monoid_trait = monoid_plus<v_info_t>, // should be commutative
     typename connectivity_t = dummy_checker,         // use "link_cut_tree" to turn on loop control
-    bool     has_debug_contraction = false,
+    bool     has_debug_contraction = false,          // use "true" to check whether non-affected vertices are not affected
     typename random_t       = std::default_random_engine
 > class sequential_rooted_rcforest
     : public rooted_rcforest<e_info_t, v_info_t, e_monoid_trait, v_monoid_trait>
@@ -540,7 +540,7 @@ template<
         void ensure_internal_vertex_is_changed(int vertex) {
             ensure_has_scheduled();
             if (vertex == -1) {
-                throw std::logic_error("[sequential_rooted_rcforest::ensure_internal_vertex_is_changed: vertex is -1");
+                throw std::logic_error("[sequential_rooted_rcforest::ensure_internal_vertex_is_changed] vertex is -1");
             }
             if (changed_vertices.count(vertex) == 0) {
                 changed_vertices.insert(vertex);
@@ -618,6 +618,54 @@ template<
             }
         }
 
+        void cartesian_detach(int vertex) {
+            if (vertex != -1) {
+                ensure_internal_vertex_is_changed(vertex);
+                vertex_col_t &vx = vertices.at(vertex);
+                int parent = vx.at_level(0).parent;
+                if (parent != -1) {
+                    internal_detach(vertex);
+                    ensure_internal_vertex_is_changed(parent);
+                    vertex_col_t &vp = vertices.at(parent);
+                    if (vp.scheduled_left_index == vertex) {
+                        vp.scheduled_left_index = -1;
+                    } else if (vp.scheduled_right_index == vertex) {
+                        vp.scheduled_right_index = -1;
+                    } else {
+                        throw std::logic_error("[cartesian_detach] Vertex is not a child of its parent");
+                    }
+                } else {
+                    throw std::logic_error("[cartesian_detach] Detaching a vertex with no parent");
+                }
+            }
+        }
+
+        void cartesian_attach_left(int parent, int child) {
+            ensure_internal_vertex_is_changed(parent);
+            vertex_col_t &vp = vertices.at(parent);
+            if (vp.scheduled_left_index != -1) {
+                throw std::logic_error("[cartesian_attach_left] Attaching to the parent onto an existing child");
+            }
+
+            if (child != -1) {
+                internal_attach(parent, child);
+                vp.scheduled_left_index = child;
+            }
+        }
+
+        void cartesian_attach_right(int parent, int child) {
+            ensure_internal_vertex_is_changed(parent);
+            vertex_col_t &vp = vertices.at(parent);
+            if (vp.scheduled_right_index != -1) {
+                throw std::logic_error("[cartesian_attach_right] Attaching to the parent onto an existing child");
+            }
+
+            if (child != -1) {
+                internal_attach(parent, child);
+                vp.scheduled_right_index = child;
+            }
+        }
+
         void internal_set_einfo(int vertex, e_info_t const &e_info_up, e_info_t const &e_info_down) {
             ensure_internal_vertex_is_changed(vertex);
             vertex_t &vx = vertices.at(vertex).at_level(0);
@@ -642,42 +690,6 @@ template<
             }
         }
 
-        int cartesian_insert(int tree, int vertex) {
-            if (tree == -1) {
-                return vertex;
-            }
-
-            ensure_internal_vertex_is_changed(tree);
-            ensure_internal_vertex_is_changed(vertex);
-
-            vertex_col_t &col_tree = vertices.at(tree);
-            vertex_col_t &col_vertex = vertices.at(vertex);
-            if (col_vertex.heap_key < col_tree.heap_key) {
-                if (col_vertex.my_index < col_tree.my_index) {
-                    col_vertex.scheduled_right_index = tree;
-                } else {
-                    col_vertex.scheduled_left_index = tree;
-                }
-                internal_attach(vertex, tree);
-                return vertex;
-            } else {
-                if (col_vertex.my_index < col_tree.my_index) {
-                    if (col_tree.scheduled_left_index != -1) {
-                        internal_detach(col_tree.scheduled_left_index);
-                    }
-                    col_tree.scheduled_left_index = cartesian_insert(col_tree.scheduled_left_index, vertex);
-                    internal_attach(tree, col_tree.scheduled_left_index);
-                } else {
-                    if (col_tree.scheduled_right_index != -1) {
-                        internal_detach(col_tree.scheduled_right_index);
-                    }
-                    col_tree.scheduled_right_index = cartesian_insert(col_tree.scheduled_right_index, vertex);
-                    internal_attach(tree, col_tree.scheduled_right_index);
-                }
-                return tree;
-            }
-        }
-
         int cartesian_merge(int left, int right) {
             if (left == -1 || right == -1) {
                 return left + right + 1;
@@ -688,20 +700,75 @@ template<
                 vertex_col_t &l = vertices.at(left);
                 vertex_col_t &r = vertices.at(right);
                 if (l.heap_key < r.heap_key) {
-                    if (l.scheduled_right_index != -1) {
-                        internal_detach(l.scheduled_right_index);
-                    }
-                    l.scheduled_right_index = cartesian_merge(l.scheduled_right_index, right);
-                    internal_attach(left, l.scheduled_right_index);
+                    cartesian_detach(l.scheduled_right_index);
+                    cartesian_attach_right(left, cartesian_merge(l.scheduled_right_index, right));
                     return left;
                 } else {
-                    if (r.scheduled_left_index != -1) {
-                        internal_detach(r.scheduled_left_index);
-                    }
-                    r.scheduled_left_index = cartesian_merge(left, r.scheduled_left_index);
-                    internal_attach(right, r.scheduled_left_index);
+                    cartesian_detach(r.scheduled_left_index);
+                    cartesian_attach_left(right, cartesian_merge(left, r.scheduled_left_index));
                     return right;
                 }
+            }
+        }
+
+        std::pair<int, int> cartesian_split(int tree, int index) {
+            if (tree == -1) {
+                return std::make_pair(-1, -1);
+            }
+
+            ensure_internal_vertex_is_changed(tree);
+            vertex_col_t &col_tree = vertices.at(tree);
+
+            if (tree == index) {
+                int l = col_tree.scheduled_left_index;
+                int r = col_tree.scheduled_right_index;
+                cartesian_detach(l);
+                cartesian_detach(r);
+                return std::make_pair(l, r);
+            } else if (tree < index) {
+                int r = col_tree.scheduled_right_index;
+                cartesian_detach(r);
+                std::pair<int, int> rec = cartesian_split(r, index);
+                cartesian_attach_right(tree, rec.first);
+                rec.first = tree;
+                return rec;
+            } else {
+                int l = col_tree.scheduled_left_index;
+                cartesian_detach(l);
+                std::pair<int, int> rec = cartesian_split(l, index);
+                cartesian_attach_left(tree, rec.second);
+                rec.second = tree;
+                return rec;
+            }
+        }
+
+        int cartesian_insert(int tree, int vertex) {
+            if (tree == -1) {
+                return vertex;
+            }
+
+            ensure_internal_vertex_is_changed(tree);
+            ensure_internal_vertex_is_changed(vertex);
+
+            vertex_col_t &col_tree = vertices.at(tree);
+            vertex_col_t &col_vertex = vertices.at(vertex);
+
+            if (col_vertex.heap_key < col_tree.heap_key) {
+                std::pair<int, int> split = cartesian_split(tree, vertex);
+                cartesian_attach_left(vertex, split.first);
+                cartesian_attach_right(vertex, split.second);
+                return vertex;
+            } else {
+                if (vertex < tree) {
+                    int l = col_tree.scheduled_left_index;
+                    cartesian_detach(l);
+                    cartesian_attach_left(tree, cartesian_insert(l, vertex));
+                } else {
+                    int r = col_tree.scheduled_right_index;
+                    cartesian_detach(r);
+                    cartesian_attach_right(tree, cartesian_insert(r, vertex));
+                }
+                return tree;
             }
         }
 
@@ -715,36 +782,21 @@ template<
 
             vertex_col_t &col_vertex = vertices.at(vertex);
             if (tree == vertex) {
-                if (col_vertex.scheduled_left_index != -1) {
-                    internal_detach(col_vertex.scheduled_left_index);
-                }
-                if (col_vertex.scheduled_right_index != -1) {
-                    internal_detach(col_vertex.scheduled_right_index);
-                }
-                int rv = cartesian_merge(col_vertex.scheduled_left_index, col_vertex.scheduled_right_index);
-                col_vertex.scheduled_left_index = -1;
-                col_vertex.scheduled_right_index = -1;
-                return rv;
+                int l = col_vertex.scheduled_left_index;
+                int r = col_vertex.scheduled_right_index;
+                cartesian_detach(l);
+                cartesian_detach(r);
+                return cartesian_merge(l, r);
             } else {
                 vertex_col_t &col_tree = vertices.at(tree);
-                if (col_vertex.my_index < col_tree.my_index) {
-                    if (col_tree.scheduled_left_index == -1) {
-                        throw std::logic_error("[cartesian_delete] trying to remove something from an empty tree (left)");
-                    }
-                    internal_detach(col_tree.scheduled_left_index);
-                    col_tree.scheduled_left_index = cartesian_delete(col_tree.scheduled_left_index, vertex);
-                    if (col_tree.scheduled_left_index != -1) {
-                        internal_attach(tree, col_tree.scheduled_left_index);
-                    }
+                if (vertex < tree) {
+                    int l = col_tree.scheduled_left_index;
+                    cartesian_detach(l);
+                    cartesian_attach_left(tree, cartesian_delete(l, vertex));
                 } else {
-                    if (col_tree.scheduled_right_index == -1) {
-                        throw std::logic_error("[cartesian_delete] trying to remove something from an empty tree (right)");
-                    }
-                    internal_detach(col_tree.scheduled_right_index);
-                    col_tree.scheduled_right_index = cartesian_delete(col_tree.scheduled_right_index, vertex);
-                    if (col_tree.scheduled_right_index != -1) {
-                        internal_attach(tree, col_tree.scheduled_right_index);
-                    }
+                    int r = col_tree.scheduled_right_index;
+                    cartesian_detach(r);
+                    cartesian_attach_right(tree, cartesian_delete(r, vertex));
                 }
                 return tree;
             }
@@ -859,13 +911,27 @@ template<
                 }
             } else if (will_rake(level, vertex)) {
                 if (do_rake(level, vertex)) {
-                    next_affected.insert(vertices.at(vertex).at_level(level).parent);
+                    int p = vertices.at(vertex).at_level(level).parent;
+                    next_affected.insert(p);
+                    int gp = vertices.at(p).at_level(level).parent;
+                    if (gp != -1) {
+                        next_affected.insert(gp);
+                    }
                     return true;
                 }
             } else if (will_compress(level, vertex)) {
                 if (do_compress(level, vertex)) {
-                    next_affected.insert(vertices.at(vertex).at_level(level).parent);
-                    next_affected.insert(vertices.at(vertex).at_level(level).children[0]);
+                    int p = vertices.at(vertex).at_level(level).parent;
+                    next_affected.insert(p);
+                    int gp = vertices.at(p).at_level(level).parent;
+                    if (gp != -1) {
+                        next_affected.insert(gp);
+                    }
+                    int ch = vertices.at(vertex).at_level(level).children[0];
+                    next_affected.insert(ch);
+                    if (vertices.at(ch).at_level(level).children_count == 1) {
+                        next_affected.insert(vertices.at(ch).at_level(level).children[0]);
+                    }
                     return true;
                 }
             } else if (will_accept_change(level, vertex)) {
