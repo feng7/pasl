@@ -125,7 +125,7 @@ template<
             int scheduled_right_index;
             int heap_key;
 
-            std::vector<unsigned>   random_bits;
+            std::vector<unsigned> random_bits;
 
             bool get_random_bit(int level, random_t &rng) {
                 int v_index = level / bits_in_unsigned;
@@ -481,14 +481,19 @@ template<
 
     // Debug output
     private:
-        void print_tree(std::ostream &out) const {
+        void print_tree(std::ostream &out) {
             // Printing the stuff
             for (int i = 0; i < (int) vertices.size(); ++i) {
                 bool changed = changed_vertices.count(i) == 1;
 
                 out << "    " << i << ":" << (changed ? " **" : "") << std::endl;
-                vertex_col_t const &col = vertices.at(i);
+                vertex_col_t &col = vertices.at(i);
                 out << "         last_live_level = " << col.last_live_level << std::endl;
+                out << "         bits = ";
+                for (int i = 1; i <= col.last_live_level; ++i) {
+                    out << col.get_random_bit(i, rng);
+                }
+                out << std::endl;
                 out << "         contraction = " << (col.contraction == contract_t::root ? "root" : (col.contraction == contract_t::rake ? "rake" : "compress")) << std::endl;
                 out << "         children_count = " << col.children_count;
                 if (changed) {
@@ -672,9 +677,6 @@ template<
             vx.e_info_up = e_info_up;
             vx.e_info_down = e_info_down;
 
-            if (vx.parent != -1) {
-                ensure_internal_vertex_is_changed(vx.parent);
-            }
             if (vx.children_count == 1) {
                 ensure_internal_vertex_is_changed(vx.children[0]);
             }
@@ -906,32 +908,14 @@ template<
         bool process_vertex(int level, int vertex, std::unordered_set<int> &next_affected) {
             if (will_become_root(level, vertex)) {
                 if (do_become_root(level, vertex)) {
-                    // Seems to have nothing there, as the parent was explicitly marked
                     return true;
                 }
             } else if (will_rake(level, vertex)) {
                 if (do_rake(level, vertex)) {
-                    int p = vertices.at(vertex).at_level(level).parent;
-                    next_affected.insert(p);
-                    int gp = vertices.at(p).at_level(level).parent;
-                    if (gp != -1) {
-                        next_affected.insert(gp);
-                    }
                     return true;
                 }
             } else if (will_compress(level, vertex)) {
                 if (do_compress(level, vertex)) {
-                    int p = vertices.at(vertex).at_level(level).parent;
-                    next_affected.insert(p);
-                    int gp = vertices.at(p).at_level(level).parent;
-                    if (gp != -1) {
-                        next_affected.insert(gp);
-                    }
-                    int ch = vertices.at(vertex).at_level(level).children[0];
-                    next_affected.insert(ch);
-                    if (vertices.at(ch).at_level(level).children_count == 1) {
-                        next_affected.insert(vertices.at(ch).at_level(level).children[0]);
-                    }
                     return true;
                 }
             } else if (will_accept_change(level, vertex)) {
