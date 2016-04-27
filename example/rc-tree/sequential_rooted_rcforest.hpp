@@ -479,60 +479,6 @@ template<
             return data_index / 2;
         }
 
-    // Debug output
-    private:
-        void print_tree(std::ostream &out) {
-            // Printing the stuff
-            for (int i = 0; i < (int) vertices.size(); ++i) {
-                bool changed = changed_vertices.count(i) == 1;
-
-                out << "    " << i << ":" << (changed ? " **" : "") << std::endl;
-                vertex_col_t &col = vertices.at(i);
-                out << "         last_live_level = " << col.last_live_level << std::endl;
-                out << "         bits = ";
-                for (int i = 1; i <= col.last_live_level; ++i) {
-                    out << col.get_random_bit(i, rng);
-                }
-                out << std::endl;
-                out << "         contraction = " << (col.contraction == contract_t::root ? "root" : (col.contraction == contract_t::rake ? "rake" : "compress")) << std::endl;
-                out << "         children_count = " << col.children_count;
-                if (changed) {
-                    out << " => " << col.scheduled_children_count << std::endl;
-                } else {
-                    out << std::endl;
-                }
-                out << "         my_index = " << col.my_index << std::endl;
-                out << "         heap_key = " << col.heap_key << std::endl;
-                out << "         left_index = " << col.left_index;
-                if (changed) {
-                    out << " => " << col.scheduled_left_index << std::endl;
-                } else {
-                    out << std::endl;
-                }
-                out << "         right_index = " << col.right_index;
-                if (changed) {
-                    out << " => " << col.scheduled_right_index << std::endl;
-                } else {
-                    out << std::endl;
-                }
-
-                for (int j = 0, jj = col.last_live_level; j <= jj; ++j) {
-                    vertex_t const &vt = col.at_level(j);
-                    out << "         " << j << " -> {" << std::endl;
-                    out << "             parent = " << vt.parent << std::endl;
-                    out << "             children_count = " << vt.children_count << std::endl;
-                    out << "             children = {"
-                        << vt.children[0] << ", "
-                        << vt.children[1] << ", "
-                        << vt.children[2] << "}" << std::endl;
-                    out << "             v_info = " << vt.v_info << std::endl;
-                    out << "             e_info_up = " << vt.e_info_up << std::endl;
-                    out << "             e_info_down = " << vt.e_info_down << std::endl;
-                    out << "         }" << std::endl;
-                }
-            }
-        }
-
     // Scheduled modification helpers
     private:
         void ensure_has_scheduled() {
@@ -543,7 +489,6 @@ template<
         }
 
         void ensure_internal_vertex_is_changed(int vertex) {
-            ensure_has_scheduled();
             if (vertex == -1) {
                 throw std::logic_error("[sequential_rooted_rcforest::ensure_internal_vertex_is_changed] vertex is -1");
             }
@@ -924,14 +869,27 @@ template<
                     vertex_t &vx = vertices.at(vertex).at_level(level);
                     if (vx.parent != -1) {
                         next_affected.insert(vx.parent);
-                        vertex_t &gp = vertices.at(vx.parent).at_level(level);
-                        if (gp.parent != -1 && gp.children_count == 1) {
-                            next_affected.insert(gp.parent);
+                        vertex_t &p = vertices.at(vx.parent).at_level(level);
+                        if (p.parent != -1 && p.children_count == 1) {
+                            next_affected.insert(p.parent);
+                            vertex_t &gp = vertices.at(p.parent).at_level(level);
+                            if (gp.parent != -1 && gp.children_count == 1) {
+                                next_affected.insert(gp.parent);
+                            }
+                        }
+                        if (p.children_count == 2) {
+                            if (p.children[0] == vertex) {
+                                next_affected.insert(p.children[1]);
+                            } else if (p.children[1] == vertex) {
+                                next_affected.insert(p.children[0]);
+                            } else {
+                                throw std::logic_error("Strange parent (1)");
+                            }
                         }
                     }
-                    if (vx.children_count == 1) {
-                        next_affected.insert(vx.children[0]);
-                        vertex_t &ch = vertices.at(vx.children[0]).at_level(level);
+                    for (int i = 0; i < vx.children_count; ++i) {
+                        next_affected.insert(vx.children[i]);
+                        vertex_t &ch = vertices.at(vx.children[i]).at_level(level);
                         if (ch.children_count == 1) {
                             next_affected.insert(ch.children[0]);
                         }
@@ -944,14 +902,27 @@ template<
                     vertex_t &vx = vertices.at(vertex).at_level(level);
                     if (vx.parent != -1) {
                         next_affected.insert(vx.parent);
-                        vertex_t &gp = vertices.at(vx.parent).at_level(level);
-                        if (gp.parent != -1 && gp.children_count == 1) {
-                            next_affected.insert(gp.parent);
+                        vertex_t &p = vertices.at(vx.parent).at_level(level);
+                        if (p.parent != -1 && p.children_count == 1) {
+                            next_affected.insert(p.parent);
+                            vertex_t &gp = vertices.at(p.parent).at_level(level);
+                            if (gp.parent != -1 && gp.children_count == 1) {
+                                next_affected.insert(gp.parent);
+                            }
+                        }
+                        if (p.children_count == 2) {
+                            if (p.children[0] == vertex) {
+                                next_affected.insert(p.children[1]);
+                            } else if (p.children[1] == vertex) {
+                                next_affected.insert(p.children[0]);
+                            } else {
+                                throw std::logic_error("Strange parent (2)");
+                            }
                         }
                     }
-                    if (vx.children_count == 1) {
-                        next_affected.insert(vx.children[0]);
-                        vertex_t &ch = vertices.at(vx.children[0]).at_level(level);
+                    for (int i = 0; i < vx.children_count; ++i) {
+                        next_affected.insert(vx.children[i]);
+                        vertex_t &ch = vertices.at(vx.children[i]).at_level(level);
                         if (ch.children_count == 1) {
                             next_affected.insert(ch.children[0]);
                         }
@@ -1061,9 +1032,6 @@ template<
 
         // Applies all pending changes.
         virtual void scheduled_apply() {
-            std::ostringstream tree_content;
-            print_tree(tree_content);
-
             std::unordered_set<int> &curr_affected = changed_vertices;
             std::unordered_set<int> next_affected;
 
@@ -1090,13 +1058,56 @@ template<
             for (int level = 1; curr_affected.size() > 0; ++level, std::swap(curr_affected, next_affected)) {
                 next_affected.clear();
                 if (has_debug_contraction) {
+                    std::ostringstream tree_content;
                     for (int i = 0; i < (int) vertices.size(); ++i) {
                         if (vertices.at(i).last_live_level < level) {
                             continue;
                         }
+                        tree_content << i;
+                        if (curr_affected.count(i) == 1) {
+                            tree_content << "*";
+                        }
+                        tree_content << " = {" << std::endl;
+                        vertex_t &v = vertices.at(i).at_level(level);
+                        tree_content << "    parent = " << v.parent << std::endl;
+                        tree_content << "    children = {" << v.children[0] << ", " << v.children[1] << ", " << v.children[2] << "}" << std::endl;
+                        tree_content << "    bit = " << vertices.at(i).get_random_bit(level, rng) << std::endl;
+                        tree_content << "    v_info = " << v.v_info << std::endl;
+                        tree_content << "    e_info_up = " << v.e_info_up << std::endl;
+                        tree_content << "    e_info_down = " << v.e_info_down << std::endl;
+                        tree_content << "}" << std::endl;
+                    }
+
+                    for (int i = 0; i < (int) vertices.size(); ++i) {
+                        if (vertices.at(i).last_live_level < level) {
+                            continue;
+                        }
+                        vertex_t vx_old = vertices.at(i).last_live_level == level
+                            ? vertex_t(v_ops.neutral(), e_ops.neutral(), e_ops.neutral())
+                            : vertices.at(i).at_level(level + 1);
                         if (process_vertex(level, i, next_affected)) {
                             if (curr_affected.count(i) == 0) {
                                 std::cout << tree_content.str();
+                                vertex_t vx_new = vertices.at(i).at_level(level + 1);
+
+                                std::cout << "vx_old = {" << std::endl;
+                                std::cout << "    parent = " << vx_old.parent << std::endl;
+                                std::cout << "    children = {" << vx_old.children[0] << ", " << vx_old.children[1] << ", " << vx_old.children[2] << "}" << std::endl;
+                                std::cout << "    bit = " << vertices.at(i).get_random_bit(level, rng) << std::endl;
+                                std::cout << "    v_info = " << vx_old.v_info << std::endl;
+                                std::cout << "    e_info_up = " << vx_old.e_info_up << std::endl;
+                                std::cout << "    e_info_down = " << vx_old.e_info_down << std::endl;
+                                std::cout << "}" << std::endl;
+
+                                std::cout << "vx_new = {" << std::endl;
+                                std::cout << "    parent = " << vx_new.parent << std::endl;
+                                std::cout << "    children = {" << vx_new.children[0] << ", " << vx_new.children[1] << ", " << vx_new.children[2] << "}" << std::endl;
+                                std::cout << "    bit = " << vertices.at(i).get_random_bit(level, rng) << std::endl;
+                                std::cout << "    v_info = " << vx_new.v_info << std::endl;
+                                std::cout << "    e_info_up = " << vx_new.e_info_up << std::endl;
+                                std::cout << "    e_info_down = " << vx_new.e_info_down << std::endl;
+                                std::cout << "}" << std::endl;
+
                                 std::ostringstream oss;
                                 oss << "[sequential_rooted_rcforest::scheduled_apply] A non-affected vertex " << i << " changed at level " << level << "!";
                                 throw std::logic_error(oss.str());
