@@ -148,27 +148,35 @@ template<
             }
 
             vertex_t &at_level(int level) {
-                if (level > last_live_level) {
-                    throw std::logic_error("[vertex_col_t::at_level]: nonexistent (logically) level asked");
+                if (has_debug_contraction) {
+                    if (level > last_live_level) {
+                        throw std::logic_error("[vertex_col_t::at_level]: nonexistent (logically) level asked");
+                    }
+                    std::vector<vertex_t> &pool = (level & 1) == 1 ? odd_levels : even_levels;
+                    int real_level = level / 2;
+                    if (real_level >= (int) pool.size()) {
+                        throw std::logic_error("[vertex_col_t::at_level]: nonexistent (physically) level asked");
+                    }
+                    return pool[real_level];
+                } else {
+                    return ((level & 1) == 1 ? odd_levels : even_levels)[level / 2];
                 }
-                std::vector<vertex_t> &pool = (level & 1) == 1 ? odd_levels : even_levels;
-                int real_level = level / 2;
-                if (real_level >= (int) pool.size()) {
-                    throw std::logic_error("[vertex_col_t::at_level]: nonexistent (physically) level asked");
-                }
-                return pool[real_level];
             }
 
             vertex_t const &at_level(int level) const {
-                if (level > last_live_level) {
-                    throw std::logic_error("[vertex_col_t::at_level const]: nonexistent (logically) level asked");
+                if (has_debug_contraction) {
+                    if (level > last_live_level) {
+                        throw std::logic_error("[vertex_col_t::at_level const]: nonexistent (logically) level asked");
+                    }
+                    std::vector<vertex_t> const &pool = (level & 1) == 1 ? odd_levels : even_levels;
+                    int real_level = level / 2;
+                    if (real_level >= (int) pool.size()) {
+                        throw std::logic_error("[vertex_col_t::at_level const]: nonexistent (physically) level asked");
+                    }
+                    return pool[real_level];
+                } else {
+                    return ((level & 1) == 1 ? odd_levels : even_levels)[level / 2];
                 }
-                std::vector<vertex_t> const &pool = (level & 1) == 1 ? odd_levels : even_levels;
-                int real_level = level / 2;
-                if (real_level >= (int) pool.size()) {
-                    throw std::logic_error("[vertex_col_t::at_level const]: nonexistent (physically) level asked");
-                }
-                return pool[real_level];
             }
         };
 
@@ -265,14 +273,14 @@ template<
 
         // Returns the number of children of the given vertex.
         virtual int n_children(int vertex) const {
-            return vertices.at(2 * vertex).children_count;
+            return vertices[2 * vertex].children_count;
         }
 
         // Returns the parent of the given vertex.
         virtual int get_parent(int vertex) const {
             int vx = 2 * vertex + 1;
             while (vx != -1 && (vx & 1) == 1) {
-                vx = vertices.at(vx).at_level(1).parent;
+                vx = vertices[vx].at_level(1).parent;
             }
             if (vx == -1) {
                 // A root. For outer interface, return itself
@@ -289,7 +297,7 @@ template<
 
         // Returns the vertex info for the given vertex.
         virtual v_info_t get_vertex_info(int vertex) const {
-            return vertices.at(2 * vertex).at_level(1).v_info;
+            return vertices[2 * vertex].at_level(1).v_info;
         }
 
         // Returns the upwards edge info for the edge
@@ -298,7 +306,7 @@ template<
             if (is_root(vertex)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_upwards]: The vertex is a root!");
             }
-            return vertices.at(2 * vertex).at_level(1).e_info_up;
+            return vertices[2 * vertex].at_level(1).e_info_up;
         }
 
         // Returns the downwards edge info for the edge
@@ -307,7 +315,7 @@ template<
             if (is_root(vertex)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_downwards]: The vertex is a root!");
             }
-            return vertices.at(2 * vertex).at_level(1).e_info_down;
+            return vertices[2 * vertex].at_level(1).e_info_down;
         }
 
     // A helper for get_path
@@ -329,11 +337,11 @@ template<
             {}
 
             int get_level(std::vector<vertex_col_t> const &vertices) const {
-                return vertices.at(vertex).last_live_level;
+                return vertices[vertex].last_live_level;
             }
 
             void relax(std::vector<vertex_col_t> const &vertices) {
-                vertex_col_t const &col = vertices.at(vertex);
+                vertex_col_t const &col = vertices[vertex];
                 int level = col.last_live_level;
                 if (col.contraction == contract_t::rake || (col.contraction == contract_t::compress && compress_up)) {
                     vertex = col.at_level(level).parent;
@@ -345,9 +353,9 @@ template<
                 } else if (col.contraction == contract_t::compress) {
                     vertex = col.at_level(level).children[0];
                     if (is_first_part) {
-                        sum = e_ops.sum(sum, vertices.at(vertex).at_level(level).e_info_down);
+                        sum = e_ops.sum(sum, vertices[vertex].at_level(level).e_info_down);
                     } else {
-                        sum = e_ops.sum(vertices.at(vertex).at_level(level).e_info_up, sum);
+                        sum = e_ops.sum(vertices[vertex].at_level(level).e_info_up, sum);
                     }
                 }
             }
@@ -358,8 +366,8 @@ template<
         // Returns the root of the tree the given vertex belongs to.
         virtual int get_root(int vertex) const {
             vertex *= 2;
-            while (vertices.at(vertex).contraction != contract_t::root) {
-                vertex_col_t const &col = vertices.at(vertex);
+            while (vertices[vertex].contraction != contract_t::root) {
+                vertex_col_t const &col = vertices[vertex];
                 // both rake and compress work like this
                 vertex = col.at_level(col.last_live_level).parent;
             }
@@ -415,7 +423,7 @@ template<
             vertex *= 2;
             v_info_t rv = v_ops.neutral();
             while (true) {
-                vertex_col_t const &col = vertices.at(vertex);
+                vertex_col_t const &col = vertices[vertex];
                 vertex_t const &v = col.at_level(col.last_live_level);
                 rv = v_ops.sum(rv, v.v_info);
                 if (col.contraction == contract_t::root || col.contraction == contract_t::rake) {
@@ -444,8 +452,8 @@ template<
             vertices.push_back(vertex_col_t());
             vertices.push_back(vertex_col_t());
 
-            vertex_col_t &data_col = vertices.at(data_index);
-            vertex_col_t &link_col = vertices.at(link_index);
+            vertex_col_t &data_col = vertices[data_index];
+            vertex_col_t &link_col = vertices[link_index];
 
             data_col.last_live_level = -1;
             data_col.push_level(data_vertex);
@@ -500,7 +508,7 @@ template<
             ensure_has_scheduled();
             if (changed_vertices.count(vertex) == 0) {
                 changed_vertices.insert(vertex);
-                vertex_col_t &vx = vertices.at(vertex);
+                vertex_col_t &vx = vertices[vertex];
 
                 vx.at_level(0) = vx.at_level(1);
                 vx.scheduled_left_index = vx.left_index;
@@ -510,22 +518,22 @@ template<
         }
 
         void internal_attach(int parent, int child) {
-            if (vertices.at(child).at_level(0).parent != -1) {
+            if (vertices[child].at_level(0).parent != -1) {
                 throw std::logic_error("[sequential_rooted_rcforest::internal_attach] Child is not a root!");
             }
 
             ensure_internal_vertex_is_changed(child);
             ensure_internal_vertex_is_changed(parent);
 
-            vertex_t &vch = vertices.at(child).at_level(0);
-            vertex_t &vp = vertices.at(parent).at_level(0);
+            vertex_t &vch = vertices[child].at_level(0);
+            vertex_t &vp = vertices[parent].at_level(0);
 
             if (vp.children_count == 1) {
                 ensure_internal_vertex_is_changed(vp.children[0]);
             }
             if (vp.parent != -1) {
                 ensure_internal_vertex_is_changed(vp.parent);
-                vertex_t &vgp = vertices.at(vp.parent).at_level(0);
+                vertex_t &vgp = vertices[vp.parent].at_level(0);
                 if (vgp.parent != -1 && vgp.children_count == 1) {
                     ensure_internal_vertex_is_changed(vgp.parent);
                 }
@@ -540,18 +548,18 @@ template<
 
         void internal_detach(int child) {
             ensure_internal_vertex_is_changed(child);
-            int parent = vertices.at(child).at_level(0).parent;
+            int parent = vertices[child].at_level(0).parent;
             ensure_internal_vertex_is_changed(parent);
 
-            vertex_t &vch = vertices.at(child).at_level(0);
-            vertex_t &vp = vertices.at(parent).at_level(0);
+            vertex_t &vch = vertices[child].at_level(0);
+            vertex_t &vp = vertices[parent].at_level(0);
 
             vch.parent = -1;
             vp.remove_child(child);
 
             if (vp.parent != -1) {
                 ensure_internal_vertex_is_changed(vp.parent);
-                vertex_t &vgp = vertices.at(vp.parent).at_level(0);
+                vertex_t &vgp = vertices[vp.parent].at_level(0);
                 if (vgp.parent != -1 && vgp.children_count == 1) {
                     ensure_internal_vertex_is_changed(vgp.parent);
                 }
@@ -567,12 +575,12 @@ template<
         void cartesian_detach(int vertex) {
             if (vertex != -1) {
                 ensure_internal_vertex_is_changed(vertex);
-                vertex_col_t &vx = vertices.at(vertex);
+                vertex_col_t &vx = vertices[vertex];
                 int parent = vx.at_level(0).parent;
                 if (parent != -1) {
                     internal_detach(vertex);
                     ensure_internal_vertex_is_changed(parent);
-                    vertex_col_t &vp = vertices.at(parent);
+                    vertex_col_t &vp = vertices[parent];
                     if (vp.scheduled_left_index == vertex) {
                         vp.scheduled_left_index = -1;
                     } else if (vp.scheduled_right_index == vertex) {
@@ -588,7 +596,7 @@ template<
 
         void cartesian_attach_left(int parent, int child) {
             ensure_internal_vertex_is_changed(parent);
-            vertex_col_t &vp = vertices.at(parent);
+            vertex_col_t &vp = vertices[parent];
             if (vp.scheduled_left_index != -1) {
                 throw std::logic_error("[cartesian_attach_left] Attaching to the parent onto an existing child");
             }
@@ -601,7 +609,7 @@ template<
 
         void cartesian_attach_right(int parent, int child) {
             ensure_internal_vertex_is_changed(parent);
-            vertex_col_t &vp = vertices.at(parent);
+            vertex_col_t &vp = vertices[parent];
             if (vp.scheduled_right_index != -1) {
                 throw std::logic_error("[cartesian_attach_right] Attaching to the parent onto an existing child");
             }
@@ -614,7 +622,7 @@ template<
 
         void internal_set_einfo(int vertex, e_info_t const &e_info_up, e_info_t const &e_info_down) {
             ensure_internal_vertex_is_changed(vertex);
-            vertex_t &vx = vertices.at(vertex).at_level(0);
+            vertex_t &vx = vertices[vertex].at_level(0);
             vx.e_info_up = e_info_up;
             vx.e_info_down = e_info_down;
 
@@ -626,7 +634,7 @@ template<
 
         void internal_set_vinfo(int vertex, v_info_t const &v_info) {
             ensure_internal_vertex_is_changed(vertex);
-            vertex_t &vx = vertices.at(vertex).at_level(0);
+            vertex_t &vx = vertices[vertex].at_level(0);
             vx.v_info = v_info;
 
             if (vx.children_count <= 1 && vx.parent != -1) {
@@ -641,8 +649,8 @@ template<
                 ensure_internal_vertex_is_changed(left);
                 ensure_internal_vertex_is_changed(right);
 
-                vertex_col_t &l = vertices.at(left);
-                vertex_col_t &r = vertices.at(right);
+                vertex_col_t &l = vertices[left];
+                vertex_col_t &r = vertices[right];
                 if (l.heap_key < r.heap_key) {
                     cartesian_detach(l.scheduled_right_index);
                     cartesian_attach_right(left, cartesian_merge(l.scheduled_right_index, right));
@@ -661,7 +669,7 @@ template<
             }
 
             ensure_internal_vertex_is_changed(tree);
-            vertex_col_t &col_tree = vertices.at(tree);
+            vertex_col_t &col_tree = vertices[tree];
 
             if (tree == index) {
                 int l = col_tree.scheduled_left_index;
@@ -694,8 +702,8 @@ template<
             ensure_internal_vertex_is_changed(tree);
             ensure_internal_vertex_is_changed(vertex);
 
-            vertex_col_t &col_tree = vertices.at(tree);
-            vertex_col_t &col_vertex = vertices.at(vertex);
+            vertex_col_t &col_tree = vertices[tree];
+            vertex_col_t &col_vertex = vertices[vertex];
 
             if (col_vertex.heap_key < col_tree.heap_key) {
                 std::pair<int, int> split = cartesian_split(tree, vertex);
@@ -724,7 +732,7 @@ template<
             ensure_internal_vertex_is_changed(tree);
             ensure_internal_vertex_is_changed(vertex);
 
-            vertex_col_t &col_vertex = vertices.at(vertex);
+            vertex_col_t &col_vertex = vertices[vertex];
             if (tree == vertex) {
                 int l = col_vertex.scheduled_left_index;
                 int r = col_vertex.scheduled_right_index;
@@ -732,7 +740,7 @@ template<
                 cartesian_detach(r);
                 return cartesian_merge(l, r);
             } else {
-                vertex_col_t &col_tree = vertices.at(tree);
+                vertex_col_t &col_tree = vertices[tree];
                 if (vertex < tree) {
                     int l = col_tree.scheduled_left_index;
                     cartesian_detach(l);
@@ -750,24 +758,24 @@ template<
     private:
         // These routines test if the vertex is going to be affected by contraction
         bool will_become_root(int level, int vertex) {
-            vertex_t const &v = vertices.at(vertex).at_level(level);
+            vertex_t const &v = vertices[vertex].at_level(level);
             return v.children_count == 0 && v.parent == -1;
         }
         bool will_rake(int level, int vertex) {
-            vertex_t const &v = vertices.at(vertex).at_level(level);
+            vertex_t const &v = vertices[vertex].at_level(level);
             return v.children_count == 0 && v.parent != -1;
         }
         bool will_compress(int level, int vertex) {
-            vertex_t const &v = vertices.at(vertex).at_level(level);
+            vertex_t const &v = vertices[vertex].at_level(level);
             return v.children_count == 1
                 && v.parent != -1
-                && !vertices.at(vertex).get_random_bit(level, rng)
-                && vertices.at(v.parent).get_random_bit(level, rng)
-                && vertices.at(v.children[0]).get_random_bit(level, rng)
+                && !vertices[vertex].get_random_bit(level, rng)
+                && vertices[v.parent].get_random_bit(level, rng)
+                && vertices[v.children[0]].get_random_bit(level, rng)
                 && !will_rake(level, v.children[0]);
         }
         bool will_accept_change(int level, int vertex) {
-            vertex_t const &v = vertices.at(vertex).at_level(level);
+            vertex_t const &v = vertices[vertex].at_level(level);
             for (int i = v.children_count - 1; i >= 0; --i) {
                 if (will_rake(level, v.children[i])) {
                     return true;
@@ -780,39 +788,39 @@ template<
         }
         // These routines apply contraction to vertices. They return true if something is changed. Apply with care!
         bool do_become_root(int level, int vertex) {
-            vertex_col_t &v_col = vertices.at(vertex);
+            vertex_col_t &v_col = vertices[vertex];
             bool rv = v_col.last_live_level != level || v_col.contraction != contract_t::root;
             v_col.last_live_level = level;
             v_col.contraction = contract_t::root;
             return rv;
         }
         bool do_rake(int level, int vertex) {
-            vertex_col_t &v_col = vertices.at(vertex);
+            vertex_col_t &v_col = vertices[vertex];
             bool rv = v_col.last_live_level != level || v_col.contraction != contract_t::rake;
             v_col.last_live_level = level;
             v_col.contraction = contract_t::rake;
             return rv;
         }
         bool do_compress(int level, int vertex) {
-            vertex_col_t &v_col = vertices.at(vertex);
+            vertex_col_t &v_col = vertices[vertex];
             bool rv = v_col.last_live_level != level || v_col.contraction != contract_t::compress;
             v_col.last_live_level = level;
             v_col.contraction = contract_t::compress;
             return rv;
         }
         bool do_accept_change(int level, int vertex) {
-            vertex_col_t &v_col = vertices.at(vertex);
+            vertex_col_t &v_col = vertices[vertex];
             vertex_t const &prev_vertex = v_col.at_level(level);
             vertex_t new_vertex = prev_vertex;
             if (prev_vertex.parent != -1 && will_compress(level, prev_vertex.parent)) {
-                vertex_t const &parent = vertices.at(prev_vertex.parent).at_level(level);
+                vertex_t const &parent = vertices[prev_vertex.parent].at_level(level);
                 new_vertex.e_info_up = e_ops.sum(new_vertex.e_info_up, parent.e_info_up);
                 new_vertex.e_info_down = e_ops.sum(parent.e_info_down, new_vertex.e_info_down);
                 new_vertex.parent = parent.parent;
             }
             for (int i = prev_vertex.children_count - 1; i >= 0; --i) {
                 int child_idx = prev_vertex.children[i];
-                vertex_t const &child_v = vertices.at(child_idx).at_level(level);
+                vertex_t const &child_v = vertices[child_idx].at_level(level);
                 if (will_rake(level, child_idx)) {
                     new_vertex.remove_child(child_idx);
                     new_vertex.v_info = v_ops.sum(new_vertex.v_info, child_v.v_info);
@@ -834,7 +842,7 @@ template<
             }
         }
         bool do_copy_paste(int level, int vertex) {
-            vertex_col_t &v_col = vertices.at(vertex);
+            vertex_col_t &v_col = vertices[vertex];
             vertex_t const &prev_vertex = v_col.at_level(level);
             if (v_col.last_live_level == level) {
                 v_col.push_level(prev_vertex);
@@ -852,7 +860,7 @@ template<
             // The current vertex V is ready and readable by this thread.
             // No other vertex from this level is readable nor ready.
             // Everything from "level - 1" is accessible.
-            vertex_t &new_vx = vertices.at(vertex).at_level(level);
+            vertex_t &new_vx = vertices[vertex].at_level(level);
 
             if (new_vx.parent != -1) {
                 // A parent P can definitely be affected.
@@ -874,13 +882,13 @@ template<
                 }
             } else if (will_rake(level, vertex)) {
                 if (do_rake(level, vertex)) {
-                    next_affected.insert(vertices.at(vertex).at_level(level).parent);
+                    next_affected.insert(vertices[vertex].at_level(level).parent);
                     return true;
                 }
             } else if (will_compress(level, vertex)) {
                 if (do_compress(level, vertex)) {
-                    next_affected.insert(vertices.at(vertex).at_level(level).parent);
-                    next_affected.insert(vertices.at(vertex).at_level(level).children[0]);
+                    next_affected.insert(vertices[vertex].at_level(level).parent);
+                    next_affected.insert(vertices[vertex].at_level(level).children[0]);
                     return true;
                 }
             } else if (will_accept_change(level, vertex)) {
@@ -909,7 +917,7 @@ template<
             if (scheduled_is_changed(vertex)) {
                 int vx = 2 * vertex + 1;
                 while (vx != -1 && (vx & 1) == 1) {
-                    vx = vertices.at(vx).at_level(0).parent;
+                    vx = vertices[vx].at_level(0).parent;
                 }
                 return vx == -1 ? vertex : vx / 2;
             } else {
@@ -935,7 +943,7 @@ template<
         // Returns the number of children of the given vertex after all scheduled changes are applied.
         virtual int scheduled_n_children(int vertex) const {
             return scheduled_is_changed(vertex)
-                ? vertices.at(2 * vertex).scheduled_children_count
+                ? vertices[2 * vertex].scheduled_children_count
                 : n_children(vertex);
         }
 
@@ -971,7 +979,7 @@ template<
             cartesian_delete(2 * parent, 2 * vertex + 1);
             conn_checker.cut(parent, vertex);
 
-            --vertices.at(2 * parent).scheduled_children_count;
+            --vertices[2 * parent].scheduled_children_count;
             --scheduled_edge_count;
         }
 
@@ -990,7 +998,7 @@ template<
             cartesian_insert(2 * v_parent, 2 * v_child + 1);
             conn_checker.link(v_parent, v_child);
 
-            ++vertices.at(2 * v_parent).scheduled_children_count;
+            ++vertices[2 * v_parent].scheduled_children_count;
             ++scheduled_edge_count;
         }
 
@@ -1003,7 +1011,7 @@ template<
             if (curr_affected.size() > 0) {
                 if (has_debug_contraction) {
                     for (int i = 0; i < (int) vertices.size(); ++i) {
-                        vertex_col_t &col = vertices.at(i);
+                        vertex_col_t &col = vertices[i];
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
@@ -1011,7 +1019,7 @@ template<
                     }
                 } else {
                     for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
-                        vertex_col_t &col = vertices.at(*itr);
+                        vertex_col_t &col = vertices[*itr];
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
@@ -1024,7 +1032,7 @@ template<
                 next_affected.clear();
                 if (has_debug_contraction) {
                     for (int i = 0; i < (int) vertices.size(); ++i) {
-                        if (vertices.at(i).last_live_level < level) {
+                        if (vertices[i].last_live_level < level) {
                             continue;
                         }
                         if (process_vertex(level, i, next_affected, parent_affected)) {
@@ -1039,7 +1047,7 @@ template<
                     }
                 }
                 for (auto itr = parent_affected.begin(); itr != parent_affected.end(); ++itr) {
-                    vertex_col_t const &vc = vertices.at(*itr);
+                    vertex_col_t const &vc = vertices[*itr];
                     if (vc.last_live_level > level) {
                         int parent = vc.at_level(level + 1).parent;
                         if (parent != -1) {

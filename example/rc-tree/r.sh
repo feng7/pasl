@@ -42,6 +42,16 @@ elif [[ "$1" == "perf" ]]; then
 
     ./main
     rm main
+
+elif [[ "$1" == "prof" ]]; then
+
+    g++ -std=c++11 -pg -O3 -Wall -Wextra -o main \
+        dc/dynamic_connectivity.cpp sequential_timing.cpp
+
+    ./main
+    gprof main gmon.out > gmon.txt
+    rm main gmon.out
+
 else
-    echo "Expected one of the options as the first argument: 'test', 'perf', found '$1'"
+    echo "Expected one of the options as the first argument: 'test', 'perf', 'prof', found '$1'"
 fi
