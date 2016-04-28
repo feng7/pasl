@@ -202,27 +202,29 @@ void stress_testing(int max_vertices, int max_operations, int_forest_gen gen_ans
                 }
             }
         }
+
+        for (int i = 0; i < max_vertices; ++i) {
+            X_ASSERT_EQ(get_parent(i), "get_parent(" << i << ")");
+            X_ASSERT_EQ(scheduled_get_parent(i), "scheduled_get_parent(" << i << ")");
+            X_ASSERT_EQ(is_root(i), "is_root(" << i << ")");
+            X_ASSERT_EQ(scheduled_is_root(i), "scheduled_is_root(" << i << ")");
+            X_ASSERT_EQ(get_root(i), "get_root(" << i << ")");
+        }
+
         bool dummy;
         X_DO_OR_THROW(scheduled_apply(), "scheduled_apply()", dummy);
         X_ASSERT_TRUE(dummy, "scheduled_apply shouldn't throw");
-        for (int i = 0; i < now_operations; ++i) {
-            switch (rng() % 3) {
-                case 0: {
-                    int v = rng() % max_vertices;
-                    X_ASSERT_EQ(get_subtree(v), "get_subtree(" << v << ")");
-                    break;
-                }
-                case 1: {
-                    int u = rng() % max_vertices;
-                    int v = rng() % max_vertices;
-                    X_ASSERT_EQ(get_path(u, v), "get_path(" << u << ", " << v << ")");
-                    break;
-                }
-                case 2: {
-                    int v = rng() % max_vertices;
-                    X_ASSERT_EQ(get_root(v), "get_root(" << v << ")");
-                    break;
-                }
+        for (int i = 0; i < max_vertices; ++i) {
+            X_ASSERT_EQ(get_root(i), "get_root(" << i << ")");
+            X_ASSERT_EQ(is_root(i), "is_root(" << i << ")");
+            X_ASSERT_EQ(get_parent(i), "get_parent(" << i << ")");
+            X_ASSERT_EQ(get_edge_info_upwards(i), "get_edge_info_upwards(" << i << ")");
+            X_ASSERT_EQ(get_edge_info_downwards(i), "get_edge_info_downwards(" << i << ")");
+        }
+        for (int i = 0; i < max_vertices; ++i) {
+            X_ASSERT_EQ(get_subtree(i), "get_subtree(" << i << ")");
+            for (int j = 0; j < max_vertices; ++j) {
+                X_ASSERT_EQ(get_path(i, j), "get_path(" << i << ", " << j << ")");
             }
         }
     }
@@ -259,6 +261,20 @@ int main() {
     stress_testing(10, 10000, naive, naive);
     cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
     stress_testing(10, 10000, naive, seq);
+    cout << "    done!" << endl;
+
+    cout << "10 vertices 100000 operations" << endl;
+    cout << "  Starting naive vs naive..." << endl;
+    stress_testing(10, 100000, naive, naive);
+    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
+    stress_testing(10, 100000, naive, seq);
+    cout << "    done!" << endl;
+
+    cout << "100 vertices 10000 operations" << endl;
+    cout << "  Starting naive vs naive..." << endl;
+    stress_testing(100, 10000, naive, naive);
+    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
+    stress_testing(100, 10000, naive, seq);
     cout << "    done!" << endl;
     return 0;
 }
