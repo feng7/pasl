@@ -13,8 +13,6 @@
 #include "rooted_rcforest.hpp"
 #include "dc/dynamic_connectivity.hpp"
 
-#include <iostream>
-
 // A sequential implementation of the rooted RC-forest.
 template<
     typename e_info_t,
@@ -333,6 +331,7 @@ template<
             int get_level(std::vector<vertex_col_t> const &vertices) const {
                 return vertices.at(vertex).last_live_level;
             }
+
             void relax(std::vector<vertex_col_t> const &vertices) {
                 vertex_col_t const &col = vertices.at(vertex);
                 int level = col.last_live_level;
@@ -511,9 +510,6 @@ template<
         }
 
         void internal_attach(int parent, int child) {
-            if (parent < 0 || child < 0) {
-                throw std::logic_error("[sequential_rooted_rcforest::internal_attach] Negative arguments!");
-            }
             if (vertices.at(child).at_level(0).parent != -1) {
                 throw std::logic_error("[sequential_rooted_rcforest::internal_attach] Child is not a root!");
             }
@@ -543,15 +539,8 @@ template<
         }
 
         void internal_detach(int child) {
-            if (child < 0) {
-                throw std::logic_error("[sequential_rooted_rcforest::internal_detach] Negative arguments!");
-            }
-
             ensure_internal_vertex_is_changed(child);
             int parent = vertices.at(child).at_level(0).parent;
-            if (parent == -1) {
-                throw std::logic_error("[sequential_rooted_rcforest::internal_detach] Child does not have a parent!");
-            }
             ensure_internal_vertex_is_changed(parent);
 
             vertex_t &vch = vertices.at(child).at_level(0);
@@ -1031,68 +1020,17 @@ template<
                 }
             }
 
-            std::ostringstream tree_content;
-
             for (int level = 1; curr_affected.size() > 0; ++level, std::swap(curr_affected, next_affected)) {
                 next_affected.clear();
                 if (has_debug_contraction) {
-                    tree_content << " =================== Level " << level << " ===================" << std::endl;
                     for (int i = 0; i < (int) vertices.size(); ++i) {
                         if (vertices.at(i).last_live_level < level) {
                             continue;
                         }
-                        tree_content << i;
-                        if (curr_affected.count(i) == 1) {
-                            tree_content << "*";
-                        }
-                        tree_content << " = {" << std::endl;
-                        vertex_t &v = vertices.at(i).at_level(level);
-                        tree_content << "    parent = " << v.parent << std::endl;
-                        tree_content << "    children = {" << v.children[0] << ", " << v.children[1] << ", " << v.children[2] << "}" << std::endl;
-                        tree_content << "    bit = " << vertices.at(i).get_random_bit(level, rng) << std::endl;
-                        tree_content << "    v_info = " << v.v_info << std::endl;
-                        tree_content << "    e_info_up = " << v.e_info_up << std::endl;
-                        tree_content << "    e_info_down = " << v.e_info_down << std::endl;
-                        tree_content << "}" << std::endl;
-                    }
-
-                    for (int i = 0; i < (int) vertices.size(); ++i) {
-                        if (vertices.at(i).last_live_level < level) {
-                            continue;
-                        }
-                        vertex_t vx_old = vertices.at(i).last_live_level == level
-                            ? vertex_t(v_ops.neutral(), e_ops.neutral(), e_ops.neutral())
-                            : vertices.at(i).at_level(level + 1);
                         if (process_vertex(level, i, next_affected, parent_affected)) {
-                            tree_content << "vertex " << i << " was changed" << std::endl;
                             if (curr_affected.count(i) == 0) {
-                                std::cout << tree_content.str();
-                                vertex_t vx_new = vertices.at(i).at_level(level + 1);
-
-                                std::cout << "vx_old = {" << std::endl;
-                                std::cout << "    parent = " << vx_old.parent << std::endl;
-                                std::cout << "    children = {" << vx_old.children[0] << ", " << vx_old.children[1] << ", " << vx_old.children[2] << "}" << std::endl;
-                                std::cout << "    bit = " << vertices.at(i).get_random_bit(level, rng) << std::endl;
-                                std::cout << "    v_info = " << vx_old.v_info << std::endl;
-                                std::cout << "    e_info_up = " << vx_old.e_info_up << std::endl;
-                                std::cout << "    e_info_down = " << vx_old.e_info_down << std::endl;
-                                std::cout << "}" << std::endl;
-
-                                std::cout << "vx_new = {" << std::endl;
-                                std::cout << "    parent = " << vx_new.parent << std::endl;
-                                std::cout << "    children = {" << vx_new.children[0] << ", " << vx_new.children[1] << ", " << vx_new.children[2] << "}" << std::endl;
-                                std::cout << "    bit = " << vertices.at(i).get_random_bit(level, rng) << std::endl;
-                                std::cout << "    v_info = " << vx_new.v_info << std::endl;
-                                std::cout << "    e_info_up = " << vx_new.e_info_up << std::endl;
-                                std::cout << "    e_info_down = " << vx_new.e_info_down << std::endl;
-                                std::cout << "}" << std::endl;
-
-                                std::ostringstream oss;
-                                oss << "[sequential_rooted_rcforest::scheduled_apply] A non-affected vertex " << i << " changed at level " << level << "!";
-                                throw std::logic_error(oss.str());
+                                throw std::logic_error("[sequential_rooted_rcforest::scheduled_apply] A non-affected vertex changed!");
                             }
-                        } else {
-                            tree_content << "vertex " << i << " was NOT changed" << std::endl;
                         }
                     }
                 } else {
@@ -1105,7 +1043,6 @@ template<
                     if (vc.last_live_level > level) {
                         int parent = vc.at_level(level + 1).parent;
                         if (parent != -1) {
-                            tree_content << "vertex " << parent << " was parent-affected" << std::endl;
                             next_affected.insert(parent);
                         }
                     }
