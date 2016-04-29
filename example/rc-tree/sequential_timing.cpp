@@ -14,6 +14,13 @@ using std::endl;
 using std::function;
 using std::string;
 
+void timed_scheduled_apply(sequential_rooted_rcforest<int, int> &forest) {
+    clock_t start_time = clock();
+    forest.scheduled_apply();
+    clock_t end_time = clock();
+    cout << "    scheduled_apply: " << ((double) (end_time - start_time) / CLOCKS_PER_SEC) << " sec" << endl;
+}
+
 void long_chain(int size) {
     sequential_rooted_rcforest<int, int> forest;
     for (int i = 0; i < size; ++i) {
@@ -22,7 +29,7 @@ void long_chain(int size) {
     for (int i = 1; i < size; ++i) {
         forest.scheduled_attach(i - 1, i, 1, 1);
     }
-    forest.scheduled_apply();
+    timed_scheduled_apply(forest);
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
@@ -43,7 +50,7 @@ void large_degree(int size) {
     for (int i = 1; i < size; ++i) {
         forest.scheduled_attach(0, i, 1, 1);
     }
-    forest.scheduled_apply();
+    timed_scheduled_apply(forest);
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
@@ -76,7 +83,7 @@ void two_large_degrees(int size) {
         forest.scheduled_attach(half_size, half_size + i, 2, 2);
     }
     forest.scheduled_attach(0, half_size, 3, 3);
-    forest.scheduled_apply();
+    timed_scheduled_apply(forest);
 
     int expected_path[][4] = {
         { 0, 3, 1, 5 },
@@ -115,7 +122,8 @@ void incremental_long_chain(int size) {
         if (round != 0) {
             forest.scheduled_attach(previous_size - 1, previous_size, 1, 1);
         }
-        forest.scheduled_apply();
+
+        timed_scheduled_apply(forest);
 
         int actual_size = forest.n_vertices();
         for (int i = 0; i < actual_size; ++i) {
@@ -135,11 +143,13 @@ void timing(string name, function<void(int)> callee) {
     int sizes[] = {100, 1000, 10000, 100000, 1000000};
 
     for (int i = 0; i < 5; ++i) {
+        cout << name << ": " << sizes[i] << " => " << endl;
+
         clock_t start_time = clock();
         callee(sizes[i]);
         clock_t end_time = clock();
 
-        cout << name << ": " << sizes[i] << " => " << ((double) (end_time - start_time) / CLOCKS_PER_SEC) << " sec" << endl;
+        cout << "    Total time " << ((double) (end_time - start_time) / CLOCKS_PER_SEC) << " sec" << endl;
     }
 }
 
