@@ -31,7 +31,8 @@ PROGRAMS=\
 	fib.cpp \
 	hull.cpp \
 	bhut.cpp \
-	sequence.cpp
+	sequence.cpp \
+	rc-tree/parallel_timing.cpp
 #       add reference to your cpp source here
 
 ####################################################################

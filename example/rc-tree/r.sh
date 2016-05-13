@@ -43,6 +43,14 @@ elif [[ "$1" == "perf" ]]; then
     ./main
     rm main
 
+elif [[ "$1" == "perfp" ]]; then
+
+    g++ -std=c++11 -O3 -Wall -Wextra -o main \
+        dc/dynamic_connectivity.cpp parallel_timing.cpp
+
+    ./main
+    rm main
+
 elif [[ "$1" == "prof" ]]; then
 
     g++ -std=c++11 -pg -O3 -Wall -Wextra -o main \
