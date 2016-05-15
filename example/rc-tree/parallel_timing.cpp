@@ -27,20 +27,21 @@ void long_chain(int size) {
     for (int i = 0; i < size; ++i) {
         forest.create_vertex(1);
     }
+
     for (int i = 1; i < size; ++i) {
         forest.scheduled_attach(i - 1, i, 1, 1);
     }
     timed_scheduled_apply(forest);
-    for (int i = 0; i < size; ++i) {
-        int source = ((i * 3214 + 9132) % size + size) % size;
-        int target = ((i * 26466 + 913532) % size + size) % size;
-        if (forest.get_path(source, target) != std::abs(source - target)) {
-            throw std::logic_error("Wrong result (get_path)");
-        }
-        if (forest.get_subtree(i) != size - i) {
-            throw std::logic_error("Wrong result (get_subtree)");
-        }
-    }
+    pasl::sched::native::parallel_for (int(0),size, [&] (int i) {
+      int source = ((i * 3214 + 9132) % size + size) % size;
+      int target = ((i * 26466 + 913532) % size + size) % size;
+      if (forest.get_path(source, target) != std::abs(source - target)) {
+          throw std::logic_error("Wrong result (get_path)");
+      }
+      if (forest.get_subtree(i) != size - i) {
+          throw std::logic_error("Wrong result (get_subtree)");
+      }
+    });
 }
 
 void large_degree(int size) {
@@ -52,24 +53,24 @@ void large_degree(int size) {
         forest.scheduled_attach(0, i, 1, 1);
     }
     timed_scheduled_apply(forest);
-    for (int i = 0; i < size; ++i) {
-        int source = ((i * 3214 + 9132) % size + size) % size;
-        int target = ((i * 26466 + 913532) % size + size) % size;
-        int expected_path;
-        if (source == target) {
-            expected_path = 0;
-        } else if (source == 0 || target == 0) {
-            expected_path = 1;
-        } else {
-            expected_path = 2;
-        }
-        if (forest.get_path(source, target) != expected_path) {
-            throw std::logic_error("Wrong result (get_path)");
-        }
-        if (forest.get_subtree(i) != (i == 0 ? size : 1)) {
-            throw std::logic_error("Wrong result (get_subtree)");
-        }
-    }
+    pasl::sched::native::parallel_for (int(0),size, [&] (int i) {
+      int source = ((i * 3214 + 9132) % size + size) % size;
+      int target = ((i * 26466 + 913532) % size + size) % size;
+      int expected_path;
+      if (source == target) {
+          expected_path = 0;
+      } else if (source == 0 || target == 0) {
+          expected_path = 1;
+      } else {
+          expected_path = 2;
+      }
+      if (forest.get_path(source, target) != expected_path) {
+          throw std::logic_error("Wrong result (get_path)");
+      }
+      if (forest.get_subtree(i) != (i == 0 ? size : 1)) {
+          throw std::logic_error("Wrong result (get_subtree)");
+      }
+    });
 }
 
 void two_large_degrees(int size) {
@@ -92,19 +93,18 @@ void two_large_degrees(int size) {
         { 1, 4, 2, 6 },
         { 5, 2, 6, 4 }
     };
-
-    for (int i = 0; i < size; ++i) {
-        int source = ((i * 3214 + 9132) % size + size) % size;
-        int target = ((i * 26466 + 913532) % size + size) % size;
-        int g_source = source == 0 ? 0 : source == half_size ? 1 : source < half_size ? 2 : 3;
-        int g_target = target == 0 ? 0 : target == half_size ? 1 : target < half_size ? 2 : 3;
-        int expected = source == target ? 0 : expected_path[g_source][g_target];
-        int found = forest.get_path(source, target);
-        if (found != expected) {
-            cout << "source=" << source << " target=" << target << " g_source=" << g_source << " g_target=" << g_target << " expected=" << expected << " found=" << found << endl;
-            throw std::logic_error("Wrong result (get_path)");
-        }
-    }
+    pasl::sched::native::parallel_for (int(0),size, [&] (int i) {
+      int source = ((i * 3214 + 9132) % size + size) % size;
+      int target = ((i * 26466 + 913532) % size + size) % size;
+      int g_source = source == 0 ? 0 : source == half_size ? 1 : source < half_size ? 2 : 3;
+      int g_target = target == 0 ? 0 : target == half_size ? 1 : target < half_size ? 2 : 3;
+      int expected = source == target ? 0 : expected_path[g_source][g_target];
+      int found = forest.get_path(source, target);
+      if (found != expected) {
+          cout << "source=" << source << " target=" << target << " g_source=" << g_source << " g_target=" << g_target << " expected=" << expected << " found=" << found << endl;
+          throw std::logic_error("Wrong result (get_path)");
+      }
+    });
 }
 
 void incremental_long_chain(int size) {
@@ -127,16 +127,16 @@ void incremental_long_chain(int size) {
         timed_scheduled_apply(forest);
 
         int actual_size = forest.n_vertices();
-        for (int i = 0; i < actual_size; ++i) {
-            int source = ((i * 3214 + 9132) % actual_size + actual_size) % actual_size;
-            int target = ((i * 26466 + 913532) % actual_size + actual_size) % actual_size;
-            if (forest.get_path(source, target) != std::abs(source - target)) {
-                throw std::logic_error("Wrong result (get_path)");
-            }
-            if (forest.get_subtree(i) != actual_size - i) {
-                throw std::logic_error("Wrong result (get_subtree)");
-            }
-        }
+        pasl::sched::native::parallel_for (int(0),actual_size, [&] (int i) {
+          int source = ((i * 3214 + 9132) % actual_size + actual_size) % actual_size;
+          int target = ((i * 26466 + 913532) % actual_size + actual_size) % actual_size;
+          if (forest.get_path(source, target) != std::abs(source - target)) {
+              throw std::logic_error("Wrong result (get_path)");
+          }
+          if (forest.get_subtree(i) != actual_size - i) {
+              throw std::logic_error("Wrong result (get_subtree)");
+          }
+        });
     }
 }
 

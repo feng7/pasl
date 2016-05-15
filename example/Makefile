@@ -29,10 +29,7 @@ VERBOSE_DEPENDENCIES=0
 
 PROGRAMS=\
 	fib.cpp \
-	hull.cpp \
-	bhut.cpp \
-	sequence.cpp \
-	rc-tree/parallel_timing.cpp
+	parallel_timing.cpp
 #       add reference to your cpp source here
 
 ####################################################################
@@ -71,7 +68,7 @@ COMPILE_OPTIONS_FOR_cilk=$(OPTIONS_cilk) $(OPTIONS_O2)
 
 # Folders where to find all the header files and main sources
 
-INCLUDES=. $(SEQUTIL_PATH) $(PARUTIL_PATH) $(SCHED_PATH) $(PBBS_PATH) $(MALLOC_COUNT_PATH)
+INCLUDES=. rc-tree  $(SEQUTIL_PATH) $(PARUTIL_PATH) $(SCHED_PATH) $(PBBS_PATH) $(MALLOC_COUNT_PATH)
 
 # Folders where to find all the source files
 

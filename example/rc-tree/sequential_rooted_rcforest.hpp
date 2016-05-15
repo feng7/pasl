@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "rooted_rcforest.hpp"
-#include "dc/dynamic_connectivity.hpp"
+#include "dynamic_connectivity.hpp"
 
 // A sequential implementation of the rooted RC-forest.
 template<

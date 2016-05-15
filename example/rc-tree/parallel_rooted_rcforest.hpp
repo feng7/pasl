@@ -11,7 +11,7 @@
 #include <vector>
 #include "native.hpp"
 #include "rooted_rcforest.hpp"
-#include "dc/dynamic_connectivity.hpp"
+#include "dynamic_connectivity.hpp"
 
 // A parallel implementation of the rooted RC-forest.
 template<
@@ -1018,8 +1018,12 @@ template<
                         col.children_count = col.scheduled_children_count;
                     }
                 } else {
-                  native::parallel_for(auto(parent_affected.begin()), auto(parent_affected.end()), [&] (auto itr) {
-                        vertex_col_t &col = vertices[*itr];
+                  std::vector <int> itr;
+                  std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
+                  int size = itr.size();
+                  pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                        auto v =itr[i];
+                        vertex_col_t &col = vertices[v];
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
@@ -1041,19 +1045,27 @@ template<
                         }
                     }
                 } else {
-                    native::parallel_for(auto(parent_affected.begin()), auto(parent_affected.end()), [&] (auto itr) {
-                        process_vertex(level, *itr, next_affected, parent_affected);
+                  std::vector <int> itr;
+                  std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
+                  int size = itr.size();
+                  pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                      auto v =itr[i];
+                        process_vertex(level, v, next_affected, parent_affected);
                     });
                 }
-                native::parallel_for(auto(parent_affected.begin()), auto(parent_affected.end()), [&] (auto itr) {
-                    vertex_col_t const &vc = vertices[*itr];
+                std::vector <int> itr;
+                std::copy(parent_affected.begin(), parent_affected.end(), std::back_inserter(itr));
+                int size = itr.size();
+                pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                    auto v =itr[i];
+                    vertex_col_t const &vc = vertices[v];
                     if (vc.last_live_level > level) {
                         int parent = vc.at_level(level + 1).parent;
                         if (parent != -1) {
                             next_affected.insert(parent);
                         }
                     }
-                });
+                  });
                 parent_affected.clear();
             }
             edge_count = scheduled_edge_count;
