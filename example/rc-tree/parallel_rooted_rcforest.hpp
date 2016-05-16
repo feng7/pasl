@@ -9,6 +9,7 @@
 #include <random>
 #include <unordered_set>
 #include <vector>
+#include <mutex>
 #include "native.hpp"
 #include "rooted_rcforest.hpp"
 #include "dynamic_connectivity.hpp"
@@ -1045,27 +1046,29 @@ template<
                         }
                     }
                 } else {
+                  std::mutex mtx;
                   std::vector <int> itr;
                   std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
                   int size = itr.size();
                   pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                      auto v =itr[i];
-                        process_vertex(level, v, next_affected, parent_affected);
+                        std::unique_lock<std::mutex> lck;
+                        lck = std::unique_lock<std::mutex>(mtx);
+                        process_vertex(level, itr[i], next_affected, parent_affected);
                     });
-                }
-                std::vector <int> itr;
-                std::copy(parent_affected.begin(), parent_affected.end(), std::back_inserter(itr));
-                int size = itr.size();
-                pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                    auto v =itr[i];
-                    vertex_col_t const &vc = vertices[v];
-                    if (vc.last_live_level > level) {
-                        int parent = vc.at_level(level + 1).parent;
-                        if (parent != -1) {
-                            next_affected.insert(parent);
-                        }
-                    }
-                  });
+              }
+              std::vector <int> itr;
+              std::copy(parent_affected.begin(), parent_affected.end(), std::back_inserter(itr));
+              int size = itr.size();
+              pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                  auto v =itr[i];
+                  vertex_col_t const &vc = vertices[v];
+                  if (vc.last_live_level > level) {
+                      int parent = vc.at_level(level + 1).parent;
+                      if (parent != -1) {
+                          next_affected.insert(parent);
+                      }
+                  }
+                });
                 parent_affected.clear();
             }
             edge_count = scheduled_edge_count;
