@@ -1,5 +1,5 @@
-#ifndef __PARALLEL_ROOTED_RCFOREST_HPP
-#define __PARALLEL_ROOTED_RCFOREST_HPP
+#ifndef __SEQUENTIAL_ROOTED_RCFOREST_HPP
+#define __SEQUENTIAL_ROOTED_RCFOREST_HPP
 
 #if __cplusplus < 201103L
 #   error "This header requires C++11"
@@ -10,11 +10,10 @@
 #include <unordered_set>
 #include <vector>
 #include <mutex>
-#include "native.hpp"
 #include "rooted_rcforest.hpp"
 #include "dynamic_connectivity.hpp"
 
-// A parallel implementation of the rooted RC-forest.
+// A sequential implementation of the rooted RC-forest.
 template<
     typename e_info_t,
     typename v_info_t,
@@ -23,7 +22,7 @@ template<
     typename connectivity_t = dummy_checker,         // use "link_cut_tree" to turn on loop control
     bool     has_debug_contraction = false,          // use "true" to check whether non-affected vertices are not affected
     typename random_t       = std::default_random_engine
-> class parallel_rooted_rcforest
+> class sequential_rooted_rcforest
     : public rooted_rcforest<e_info_t, v_info_t, e_monoid_trait, v_monoid_trait>
 {
     // Members
@@ -197,7 +196,7 @@ template<
 
     // Constructors
     public:
-        parallel_rooted_rcforest(
+        sequential_rooted_rcforest(
             e_monoid_trait const &e_ops = e_monoid_trait(),
             v_monoid_trait const &v_ops = v_monoid_trait(),
             unsigned seed = 239 //(unsigned) (std::chrono::system_clock::now().time_since_epoch().count())
@@ -212,8 +211,8 @@ template<
           , conn_checker()
         {}
 
-        parallel_rooted_rcforest(
-            parallel_rooted_rcforest const &src
+        sequential_rooted_rcforest(
+            sequential_rooted_rcforest const &src
         ) : e_ops(src.e_ops)
           , v_ops(src.v_ops)
           , edge_count(src.edge_count)
@@ -225,8 +224,8 @@ template<
           , conn_checker(src.conn_checker)
         {}
 
-        parallel_rooted_rcforest &operator = (
-            parallel_rooted_rcforest const &src
+        sequential_rooted_rcforest &operator = (
+            sequential_rooted_rcforest const &src
         ) {
             e_ops                = src.e_ops;
             v_ops                = src.v_ops;
@@ -240,8 +239,8 @@ template<
             return *this;
         }
 
-        parallel_rooted_rcforest &operator = (
-            parallel_rooted_rcforest &&src
+        sequential_rooted_rcforest &operator = (
+            sequential_rooted_rcforest &&src
         ) {
             e_ops                = src.e_ops;
             v_ops                = src.v_ops;
@@ -305,7 +304,7 @@ template<
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_upwards(int vertex) const {
             if (is_root(vertex)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::get_edge_info_upwards]: The vertex is a root!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_upwards]: The vertex is a root!");
             }
             return vertices[2 * vertex].at_level(1).e_info_up;
         }
@@ -314,7 +313,7 @@ template<
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_downwards(int vertex) const {
             if (is_root(vertex)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::get_edge_info_downwards]: The vertex is a root!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_downwards]: The vertex is a root!");
             }
             return vertices[2 * vertex].at_level(1).e_info_down;
         }
@@ -378,7 +377,7 @@ template<
         // Returns the monoid sum for the path from the first vertex to the last one.
         virtual e_info_t get_path(int v_first, int v_last) const {
             if (get_root(v_first) != get_root(v_last)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::get_path]: There is no path between the vertices!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_path]: There is no path between the vertices!");
             }
 
             // You never know which way to go when a vertex is compressed.
@@ -504,7 +503,7 @@ template<
 
         void ensure_internal_vertex_is_changed(int vertex) {
             if (vertex == -1) {
-                throw std::logic_error("[parallel_rooted_rcforest::ensure_internal_vertex_is_changed] vertex is -1");
+                throw std::logic_error("[sequential_rooted_rcforest::ensure_internal_vertex_is_changed] vertex is -1");
             }
             ensure_has_scheduled();
             if (changed_vertices.count(vertex) == 0) {
@@ -520,7 +519,7 @@ template<
 
         void internal_attach(int parent, int child) {
             if (vertices[child].at_level(0).parent != -1) {
-                throw std::logic_error("[parallel_rooted_rcforest::internal_attach] Child is not a root!");
+                throw std::logic_error("[sequential_rooted_rcforest::internal_attach] Child is not a root!");
             }
 
             ensure_internal_vertex_is_changed(child);
@@ -877,7 +876,7 @@ template<
         }
         std::mutex mtx;
         bool process_vertex(int level, int vertex, std::unordered_set<int> &next_affected, std::unordered_set<int> &parent_affected) {
-          std::unique_lock<std::mutex> lck (mtx);
+            std::unique_lock<std::mutex> lck (mtx);
             if (will_become_root(level, vertex)) {
                 if (do_become_root(level, vertex)) {
                     return true;
@@ -904,7 +903,6 @@ template<
                     return true;
                 }
             }
-
             return false;
         }
 
@@ -966,7 +964,7 @@ template<
         // going from the given vertex to its parent.
         virtual void scheduled_set_edge_info(int vertex, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
             if (scheduled_is_root(vertex)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::scheduled_set_edge_info] The vertex is a root!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_set_edge_info] The vertex is a root!");
             }
             internal_set_einfo(2 * vertex, edge_upwards, edge_downwards);
         }
@@ -975,7 +973,7 @@ template<
         // the given vertex to be detached from its parent.
         virtual void scheduled_detach(int vertex) {
             if (scheduled_is_root(vertex)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::scheduled_set_edge_info] The vertex is already a root!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_set_edge_info] The vertex is already a root!");
             }
 
             int parent = scheduled_get_parent(vertex);
@@ -990,11 +988,11 @@ template<
         // the given child vertex to be attached to the given parent vertex.
         virtual void scheduled_attach(int v_parent, int v_child, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
             if (!scheduled_is_root(v_child)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
             }
 
             if (conn_checker.test_connectivity(v_parent, v_child)) {
-                throw std::invalid_argument("[parallel_rooted_rcforest::scheduled_attach] The parent and the child are already connected!");
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_attach] The parent and the child are already connected!");
             }
 
             internal_set_einfo(2 * v_child, edge_upwards, edge_downwards);
@@ -1021,30 +1019,21 @@ template<
                         col.children_count = col.scheduled_children_count;
                     }
                 } else {
-                  std::vector <int> itr;
-                  std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
-                  int size = itr.size();
-                  if(size>100){
-                    pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                          auto v =itr[i];
-                          vertex_col_t &col = vertices[v];
-                          col.at_level(1) = col.at_level(0);
-                          col.left_index = col.scheduled_left_index;
-                          col.right_index = col.scheduled_right_index;
-                          col.children_count = col.scheduled_children_count;
-                      });
-                  }else{
-                    for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
-                        vertex_col_t &col = vertices[*itr];
+                    std::vector <int> itr;
+                    std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
+                    int size = itr.size();
+                    #pragma omp parallel for
+                    for (int i = 0; i<size; ++i) {
+                        auto v =itr[i];
+                        vertex_col_t &col = vertices[v];
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
                         col.children_count = col.scheduled_children_count;
                     }
-                  }
-
                 }
             }
+
             for (int level = 1; curr_affected.size() > 0; ++level, std::swap(curr_affected, next_affected)) {
                 next_affected.clear();
                 if (has_debug_contraction) {
@@ -1054,29 +1043,24 @@ template<
                         }
                         if (process_vertex(level, i, next_affected, parent_affected)) {
                             if (curr_affected.count(i) == 0) {
-                                throw std::logic_error("[parallel_rooted_rcforest::scheduled_apply] A non-affected vertex changed!");
+                                throw std::logic_error("[sequential_rooted_rcforest::scheduled_apply] A non-affected vertex changed!");
                             }
                         }
                     }
                 } else {
-                  std::vector <int> itr;
-                  std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
-                  int size = itr.size();
-                  if(size>100){
-                    pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                          process_vertex(level, itr[i], next_affected, parent_affected);
-                      });
-                  }else{
-                    for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
-                        process_vertex(level, *itr, next_affected, parent_affected);
+                    std::vector <int> itr;
+                    std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
+                    int size = itr.size();
+                    #pragma omp parallel for
+                    for (int i = 0; i<size; ++i) {
+                        process_vertex(level, itr[i], next_affected, parent_affected);
                     }
-                  }
-              }
-              std::vector <int> itr;
-              std::copy(parent_affected.begin(), parent_affected.end(), std::back_inserter(itr));
-              int size = itr.size();
-              if(size>100){
-                pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                }
+                std::vector <int> itr;
+                std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
+                int size = itr.size();
+                #pragma omp parallel for
+                for (int i = 0; i<size; ++i) {
                     auto v =itr[i];
                     vertex_col_t const &vc = vertices[v];
                     if (vc.last_live_level > level) {
@@ -1085,18 +1069,7 @@ template<
                             next_affected.insert(parent);
                         }
                     }
-                  });
-              }else{
-                for (auto itr = parent_affected.begin(); itr != parent_affected.end(); ++itr) {
-                    vertex_col_t const &vc = vertices[*itr];
-                    if (vc.last_live_level > level) {
-                        int parent = vc.at_level(level + 1).parent;
-                        if (parent != -1) {
-                            next_affected.insert(parent);
-                        }
-                    }
                 }
-              }
                 parent_affected.clear();
             }
             edge_count = scheduled_edge_count;
@@ -1114,7 +1087,7 @@ template<
 
     // A necessary virtual destructor
     public:
-        virtual ~parallel_rooted_rcforest() {}
+        virtual ~sequential_rooted_rcforest() {}
 };
 
 #endif

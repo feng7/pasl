@@ -5,7 +5,7 @@
 #include <string>
 
 #include "rooted_rcforest.hpp"
-#include "sequential_rooted_rcforest.hpp"
+#include "openmp_rooted_rcforest.hpp"
 
 using std::clock;
 using std::clock_t;
@@ -30,6 +30,7 @@ void long_chain(int size) {
         forest.scheduled_attach(i - 1, i, 1, 1);
     }
     timed_scheduled_apply(forest);
+    #pragma omp parallel for
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
@@ -51,6 +52,7 @@ void large_degree(int size) {
         forest.scheduled_attach(0, i, 1, 1);
     }
     timed_scheduled_apply(forest);
+    #pragma omp parallel for
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
@@ -91,7 +93,7 @@ void two_large_degrees(int size) {
         { 1, 4, 2, 6 },
         { 5, 2, 6, 4 }
     };
-
+    #pragma omp parallel for
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
