@@ -875,8 +875,9 @@ template<
                 next_affected.insert(new_vx.children[i]);
             }
         }
-
+        std::mutex mtx;
         bool process_vertex(int level, int vertex, std::unordered_set<int> &next_affected, std::unordered_set<int> &parent_affected) {
+          std::unique_lock<std::mutex> lck (mtx);
             if (will_become_root(level, vertex)) {
                 if (do_become_root(level, vertex)) {
                     return true;
@@ -903,6 +904,7 @@ template<
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -1022,14 +1024,25 @@ template<
                   std::vector <int> itr;
                   std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
                   int size = itr.size();
-                  pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                        auto v =itr[i];
-                        vertex_col_t &col = vertices[v];
+                  if(size>500){
+                    pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                          auto v =itr[i];
+                          vertex_col_t &col = vertices[v];
+                          col.at_level(1) = col.at_level(0);
+                          col.left_index = col.scheduled_left_index;
+                          col.right_index = col.scheduled_right_index;
+                          col.children_count = col.scheduled_children_count;
+                      });
+                  }else{
+                    for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
+                        vertex_col_t &col = vertices[*itr];
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
                         col.children_count = col.scheduled_children_count;
-                    });
+                    }
+                  }
+
                 }
             }
             for (int level = 1; curr_affected.size() > 0; ++level, std::swap(curr_affected, next_affected)) {
@@ -1046,29 +1059,44 @@ template<
                         }
                     }
                 } else {
-                  std::mutex mtx;
                   std::vector <int> itr;
                   std::copy(curr_affected.begin(), curr_affected.end(), std::back_inserter(itr));
                   int size = itr.size();
-                  pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                        std::unique_lock<std::mutex> lck;
-                        lck = std::unique_lock<std::mutex>(mtx);
-                        process_vertex(level, itr[i], next_affected, parent_affected);
-                    });
+                  if(size>500){
+                    pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                          process_vertex(level, itr[i], next_affected, parent_affected);
+                      });
+                  }else{
+                    for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
+                        process_vertex(level, *itr, next_affected, parent_affected);
+                    }
+                  }
               }
               std::vector <int> itr;
               std::copy(parent_affected.begin(), parent_affected.end(), std::back_inserter(itr));
               int size = itr.size();
-              pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
-                  auto v =itr[i];
-                  vertex_col_t const &vc = vertices[v];
-                  if (vc.last_live_level > level) {
-                      int parent = vc.at_level(level + 1).parent;
-                      if (parent != -1) {
-                          next_affected.insert(parent);
-                      }
-                  }
-                });
+              if(size>500){
+                pasl::sched::native::parallel_for (int(0), size, [&] (int i) {
+                    auto v =itr[i];
+                    vertex_col_t const &vc = vertices[v];
+                    if (vc.last_live_level > level) {
+                        int parent = vc.at_level(level + 1).parent;
+                        if (parent != -1) {
+                            next_affected.insert(parent);
+                        }
+                    }
+                  });
+              }else{
+                for (auto itr = parent_affected.begin(); itr != parent_affected.end(); ++itr) {
+                    vertex_col_t const &vc = vertices[*itr];
+                    if (vc.last_live_level > level) {
+                        int parent = vc.at_level(level + 1).parent;
+                        if (parent != -1) {
+                            next_affected.insert(parent);
+                        }
+                    }
+                }
+              }
                 parent_affected.clear();
             }
             edge_count = scheduled_edge_count;
