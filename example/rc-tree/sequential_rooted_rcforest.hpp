@@ -273,11 +273,17 @@ template<
 
         // Returns the number of children of the given vertex.
         virtual int n_children(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::n_children] Invalid argument");
+            }
             return vertices[2 * vertex].children_count;
         }
 
         // Returns the parent of the given vertex.
         virtual int get_parent(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_parent] Invalid argument");
+            }
             int vx = 2 * vertex + 1;
             while (vx != -1 && (vx & 1) == 1) {
                 vx = vertices[vx].at_level(1).parent;
@@ -292,17 +298,26 @@ template<
 
         // Returns whether the given vertex is root.
         virtual bool is_root(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::is_root] Invalid argument");
+            }
             return get_parent(vertex) == vertex;
         }
 
         // Returns the vertex info for the given vertex.
         virtual v_info_t get_vertex_info(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_vertex_info] Invalid argument");
+            }
             return vertices[2 * vertex].at_level(1).v_info;
         }
 
         // Returns the upwards edge info for the edge
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_upwards(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_upwards] Invalid argument");
+            }
             if (is_root(vertex)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_upwards]: The vertex is a root!");
             }
@@ -312,6 +327,9 @@ template<
         // Returns the downwards edge info for the edge
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_downwards(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_downwards] Invalid argument");
+            }
             if (is_root(vertex)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::get_edge_info_downwards]: The vertex is a root!");
             }
@@ -365,6 +383,9 @@ template<
     public:
         // Returns the root of the tree the given vertex belongs to.
         virtual int get_root(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_root] Invalid argument");
+            }
             vertex *= 2;
             while (vertices[vertex].contraction != contract_t::root) {
                 vertex_col_t const &col = vertices[vertex];
@@ -376,6 +397,9 @@ template<
 
         // Returns the monoid sum for the path from the first vertex to the last one.
         virtual e_info_t get_path(int v_first, int v_last) const {
+            if (v_first < 0 || v_first >= n_vertices() || v_last < 0 || v_last >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_path] Invalid argument(s)");
+            }
             if (get_root(v_first) != get_root(v_last)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::get_path]: There is no path between the vertices!");
             }
@@ -420,6 +444,9 @@ template<
 
         // Returns the monoid sum for the vertices in the subtree of the given vertex.
         virtual v_info_t get_subtree(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::get_subtree] Invalid argument");
+            }
             vertex *= 2;
             v_info_t rv = v_ops.neutral();
             while (true) {
@@ -909,11 +936,17 @@ template<
     public:
         // Tests if a vertex has changed.
         virtual bool scheduled_is_changed(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_is_changed] Invalid argument");
+            }
             return changed_vertices.count(2 * vertex) != 0;
         }
 
         // Returns the parent of the given vertex after all scheduled changes are applied.
         virtual int scheduled_get_parent(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_get_parent] Invalid argument");
+            }
             if (scheduled_is_changed(vertex)) {
                 int vx = 2 * vertex + 1;
                 while (vx != -1 && (vx & 1) == 1) {
@@ -927,6 +960,9 @@ template<
 
         // Checks if the vertex is a root after all scheduled changes are applied.
         virtual bool scheduled_is_root(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_is_root] Invalid argument");
+            }
             return scheduled_get_parent(vertex) == vertex;
         }
 
@@ -942,6 +978,9 @@ template<
 
         // Returns the number of children of the given vertex after all scheduled changes are applied.
         virtual int scheduled_n_children(int vertex) const {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_n_children] Invalid argument");
+            }
             return scheduled_is_changed(vertex)
                 ? vertices[2 * vertex].scheduled_children_count
                 : n_children(vertex);
@@ -955,6 +994,9 @@ template<
         // Schedules (adds to the end of the current changelist)
         // the change of vertex information to the given vertex.
         virtual void scheduled_set_vertex_info(int vertex, v_info_t const &vertex_info) {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_set_vertex_info] Invalid argument");
+            }
             internal_set_vinfo(2 * vertex, vertex_info);
         }
 
@@ -962,6 +1004,9 @@ template<
         // the change of edge information to the edge
         // going from the given vertex to its parent.
         virtual void scheduled_set_edge_info(int vertex, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_set_edge_info] Invalid argument");
+            }
             if (scheduled_is_root(vertex)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_set_edge_info] The vertex is a root!");
             }
@@ -971,6 +1016,9 @@ template<
         // Schedules (adds to the end of the current changelist)
         // the given vertex to be detached from its parent.
         virtual void scheduled_detach(int vertex) {
+            if (vertex < 0 || vertex >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_detach] Invalid argument");
+            }
             if (scheduled_is_root(vertex)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_set_edge_info] The vertex is already a root!");
             }
@@ -986,6 +1034,9 @@ template<
         // Schedules (adds to the end of the current changelist)
         // the given child vertex to be attached to the given parent vertex.
         virtual void scheduled_attach(int v_parent, int v_child, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
+            if (v_parent < 0 || v_parent >= n_vertices() || v_child < 0 || v_child >= n_vertices()) {
+                throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_attach] Invalid argument(s)");
+            }
             if (!scheduled_is_root(v_child)) {
                 throw std::invalid_argument("[sequential_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
             }
