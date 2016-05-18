@@ -1,5 +1,5 @@
-#ifndef __NAIVE_ROOTED_RCFOREST_HPP
-#define __NAIVE_ROOTED_RCFOREST_HPP
+#ifndef __NAIVE_ROOTED_DYNFOREST_HPP
+#define __NAIVE_ROOTED_DYNFOREST_HPP
 
 #if __cplusplus < 201103L
 #   error "This header requires C++11"
@@ -10,15 +10,15 @@
 #include <utility>
 #include <vector>
 
-#include "rooted_rcforest.hpp"
+#include "rooted_dynforest.hpp"
 
-// A naive implementation of the rooted RC-forest.
+// A naive implementation of the rooted dynamic tree
 template<
     typename e_info_t,
     typename v_info_t,
     typename e_monoid_trait = monoid_plus<e_info_t>, // may be non-commutative
     typename v_monoid_trait = monoid_plus<v_info_t>  // should be commutative
-> class naive_rooted_rcforest : public rooted_rcforest<e_info_t, v_info_t, e_monoid_trait, v_monoid_trait> {
+> class naive_rooted_dynforest : public rooted_dynforest<e_info_t, v_info_t, e_monoid_trait, v_monoid_trait> {
     // Members
     private:
         struct vertex_t {
@@ -48,7 +48,7 @@ template<
 
     // Constructors
     public:
-        naive_rooted_rcforest(
+        naive_rooted_dynforest(
             e_monoid_trait const &e_ops = e_monoid_trait(),
             v_monoid_trait const &v_ops = v_monoid_trait()
         ) : vertices()
@@ -59,8 +59,8 @@ template<
           , v_ops(v_ops)
         {}
 
-        naive_rooted_rcforest(
-            naive_rooted_rcforest const &src
+        naive_rooted_dynforest(
+            naive_rooted_dynforest const &src
         ) : vertices(src.vertices)
           , edge_count(src.edge_count)
           , scheduled_edge_count(src.scheduled_edge_count)
@@ -69,8 +69,8 @@ template<
           , v_ops(src.v_ops)
         {}
 
-        naive_rooted_rcforest &operator = (
-            naive_rooted_rcforest const &src
+        naive_rooted_dynforest &operator = (
+            naive_rooted_dynforest const &src
         ) {
             vertices             = src.vertices;
             edge_count           = src.edge_count;
@@ -81,8 +81,8 @@ template<
             return *this;
         }
 
-        naive_rooted_rcforest &operator = (
-            naive_rooted_rcforest &&src
+        naive_rooted_dynforest &operator = (
+            naive_rooted_dynforest &&src
         ) {
             vertices             = src.vertices;
             edge_count           = src.edge_count;
@@ -134,7 +134,7 @@ template<
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_upwards(int vertex) const {
             if (is_root(vertex)) {
-                throw std::invalid_argument("[naive_rooted_rcforest::get_edge_info_upwards]: The vertex is a root!");
+                throw std::invalid_argument("[naive_rooted_dynforest::get_edge_info_upwards]: The vertex is a root!");
             }
             return vertices.at(vertex).e_info_up;
         }
@@ -143,7 +143,7 @@ template<
         // going from the given vertex to its parent.
         virtual e_info_t get_edge_info_downwards(int vertex) const {
             if (is_root(vertex)) {
-                throw std::invalid_argument("[naive_rooted_rcforest::get_edge_info_downwards]: The vertex is a root!");
+                throw std::invalid_argument("[naive_rooted_dynforest::get_edge_info_downwards]: The vertex is a root!");
             }
             return vertices.at(vertex).e_info_down;
         }
@@ -161,7 +161,7 @@ template<
         // Returns the monoid sum for the path from the first vertex to the last one.
         virtual e_info_t get_path(int v_first, int v_last) const {
             if (get_root(v_first) != get_root(v_last)) {
-                throw std::logic_error("[naive_rooted_rcforest::get_path] Vertices are not connected!");
+                throw std::logic_error("[naive_rooted_dynforest::get_path] Vertices are not connected!");
             }
 
             e_info_t downwards_part = e_ops.neutral();
@@ -305,7 +305,7 @@ template<
         // going from the given vertex to its parent.
         virtual void scheduled_set_edge_info(int vertex, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
             if (scheduled_is_root(vertex)) {
-                throw std::invalid_argument("[naive_rooted_rcforest::scheduled_set_edge_info] The vertex is a root!");
+                throw std::invalid_argument("[naive_rooted_dynforest::scheduled_set_edge_info] The vertex is a root!");
             }
             ensure_has_scheduled();
             ensure_vertex_is_changed(vertex);
@@ -317,7 +317,7 @@ template<
         // the given vertex to be detached from its parent.
         virtual void scheduled_detach(int vertex) {
             if (scheduled_is_root(vertex)) {
-                throw std::invalid_argument("[naive_rooted_rcforest::scheduled_detach] The vertex is already a root!");
+                throw std::invalid_argument("[naive_rooted_dynforest::scheduled_detach] The vertex is already a root!");
             }
             ensure_has_scheduled();
             ensure_vertex_is_changed(vertex);
@@ -335,11 +335,11 @@ template<
         // the given child vertex to be attached to the given parent vertex.
         virtual void scheduled_attach(int v_parent, int v_child, e_info_t const &edge_upwards, e_info_t const &edge_downwards) {
             if (!scheduled_is_root(v_child)) {
-                throw std::invalid_argument("[naive_rooted_rcforest::scheduled_attach] The child vertex is not a root!");
+                throw std::invalid_argument("[naive_rooted_dynforest::scheduled_attach] The child vertex is not a root!");
             }
             for (int vp = v_parent; ; vp = scheduled_get_parent(vp)) {
                 if (vp == v_child) {
-                    throw std::invalid_argument("[naive_rooted_rcforest::scheduled_attach] The connection will make a loop!");
+                    throw std::invalid_argument("[naive_rooted_dynforest::scheduled_attach] The connection will make a loop!");
                 }
                 if (scheduled_is_root(vp)) {
                     break;
@@ -385,7 +385,7 @@ template<
 
     // A necessary virtual destructor
     public:
-        virtual ~naive_rooted_rcforest() {}
+        virtual ~naive_rooted_dynforest() {}
 };
 
 #endif

@@ -6,9 +6,9 @@
 #include <stdexcept>
 #include <string>
 
+#include "rooted_dynforest.hpp"
+#include "naive_rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
-#include "naive_rooted_rcforest.hpp"
-#include "sequential_rooted_rcforest.hpp"
 
 using std::cout;
 using std::endl;
@@ -17,7 +17,7 @@ using std::ostringstream;
 using std::shared_ptr;
 using std::string;
 
-using int_forest     = rooted_rcforest<int, int>;
+using int_forest     = rooted_dynforest<int, int>;
 using int_forest_ptr = shared_ptr<int_forest>;
 using int_forest_gen = function<int_forest_ptr()>;
 
@@ -236,10 +236,10 @@ void stress_testing(int max_vertices, int max_operations, int_forest_gen gen_ans
 
 int main() {
     auto naive = []() -> shared_ptr<int_forest> {
-        return shared_ptr<int_forest>(new naive_rooted_rcforest<int, int>());
+        return shared_ptr<int_forest>(new naive_rooted_dynforest<int, int>());
     };
     auto seq = []() -> shared_ptr<int_forest> {
-        return shared_ptr<int_forest>(new sequential_rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
+        return shared_ptr<int_forest>(new rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
     };
 
     cout << "6 vertices 100 operations" << endl;

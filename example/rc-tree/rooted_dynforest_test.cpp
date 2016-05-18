@@ -5,9 +5,9 @@
 #include <stdexcept>
 #include <string>
 
+#include "rooted_dynforest.hpp"
+#include "naive_rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
-#include "naive_rooted_rcforest.hpp"
-#include "sequential_rooted_rcforest.hpp"
 
 using std::cout;
 using std::endl;
@@ -16,7 +16,7 @@ using std::ostringstream;
 using std::shared_ptr;
 using std::string;
 
-using int_forest     = rooted_rcforest<int, int>;
+using int_forest     = rooted_dynforest<int, int>;
 using int_forest_ptr = shared_ptr<int_forest>;
 using int_forest_gen = function<int_forest_ptr()>;
 
@@ -265,7 +265,7 @@ std::ostream &operator << (std::ostream &out, matrix const &m) {
     return out << "[" << m.aa << ", " << m.ab << ", " << m.ba << ", " << m.bb << "]";
 }
 
-using matrix_forest     = rooted_rcforest<matrix,int>;
+using matrix_forest     = rooted_dynforest<matrix,int>;
 using matrix_forest_ptr = shared_ptr<matrix_forest>;
 using matrix_forest_gen = function<matrix_forest_ptr()>;
 
@@ -488,17 +488,17 @@ void test_everything(string const &name, int_forest_gen new_forest) {
 
 int main() {
     test_everything("naive forest", []() -> shared_ptr<int_forest> {
-        return shared_ptr<int_forest>(new naive_rooted_rcforest<int, int>());
+        return shared_ptr<int_forest>(new naive_rooted_dynforest<int, int>());
     });
     test_everything("sequential forest", []() -> shared_ptr<int_forest> {
-        return shared_ptr<int_forest>(new sequential_rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
+        return shared_ptr<int_forest>(new rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
     });
 
     test_matrix("naive forest with matrix info", []() -> shared_ptr<matrix_forest> {
-        return shared_ptr<matrix_forest>(new naive_rooted_rcforest<matrix, int>());
+        return shared_ptr<matrix_forest>(new naive_rooted_dynforest<matrix, int>());
     });
     test_matrix("sequential forest with matrix info", []() -> shared_ptr<matrix_forest> {
-        return shared_ptr<matrix_forest>(new sequential_rooted_rcforest<matrix, int, monoid_plus<matrix>, monoid_plus<int>, link_cut_tree, true>());
+        return shared_ptr<matrix_forest>(new rooted_rcforest<matrix, int, monoid_plus<matrix>, monoid_plus<int>, link_cut_tree, true>());
     });
     return 0;
 }
