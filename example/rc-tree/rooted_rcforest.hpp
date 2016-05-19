@@ -199,7 +199,7 @@ template<
         rooted_rcforest(
             e_monoid_trait const &e_ops = e_monoid_trait(),
             v_monoid_trait const &v_ops = v_monoid_trait(),
-            unsigned seed = 239 //(unsigned) (std::chrono::system_clock::now().time_since_epoch().count())
+            unsigned seed = (unsigned) (std::chrono::system_clock::now().time_since_epoch().count())
         ) : e_ops(e_ops)
           , v_ops(v_ops)
           , edge_count(0)
@@ -679,12 +679,14 @@ template<
                 vertex_col_t &l = vertices[left];
                 vertex_col_t &r = vertices[right];
                 if (l.heap_key < r.heap_key) {
-                    cartesian_detach(l.scheduled_right_index);
-                    cartesian_attach_right(left, cartesian_merge(l.scheduled_right_index, right));
+                    int lr = l.scheduled_right_index;
+                    cartesian_detach(lr);
+                    cartesian_attach_right(left, cartesian_merge(lr, right));
                     return left;
                 } else {
-                    cartesian_detach(r.scheduled_left_index);
-                    cartesian_attach_left(right, cartesian_merge(left, r.scheduled_left_index));
+                    int rl = r.scheduled_left_index;
+                    cartesian_detach(rl);
+                    cartesian_attach_left(right, cartesian_merge(left, rl));
                     return right;
                 }
             }
@@ -947,15 +949,15 @@ template<
             if (vertex < 0 || vertex >= n_vertices()) {
                 throw std::invalid_argument("[rooted_rcforest::scheduled_get_parent] Invalid argument");
             }
-            if (scheduled_is_changed(vertex)) {
-                int vx = 2 * vertex + 1;
-                while (vx != -1 && (vx & 1) == 1) {
+            int vx = 2 * vertex + 1;
+            while (vx != -1 && (vx & 1) == 1) {
+                if (changed_vertices.count(vx) != 0) {
                     vx = vertices[vx].at_level(0).parent;
+                } else {
+                    vx = vertices[vx].at_level(1).parent;
                 }
-                return vx == -1 ? vertex : vx / 2;
-            } else {
-                return get_parent(vertex);
             }
+            return vx == -1 ? vertex : vx / 2;
         }
 
         // Checks if the vertex is a root after all scheduled changes are applied.
