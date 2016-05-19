@@ -14,7 +14,7 @@ if [[ "$1" == "test" ]]; then
     fi
 
     g++ -std=c++11 -O3 -Wall -Wextra -o main \
-        stress_test.cpp dc/dynamic_connectivity.cpp
+        rooted_dynforest_test.cpp dc/dynamic_connectivity.cpp
 
     ./main
     EXITCODE=$?
@@ -25,7 +25,7 @@ if [[ "$1" == "test" ]]; then
     fi
 
     g++ -std=c++11 -O3 -Wall -Wextra -o main \
-        rooted_dynforest_test.cpp dc/dynamic_connectivity.cpp
+        stress_test.cpp dc/dynamic_connectivity.cpp
 
     ./main
     EXITCODE=$?

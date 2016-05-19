@@ -62,6 +62,8 @@ void assert_equal_impl(int line, T const &expected, T const &found) {
 
 // just a couple of quotes for stupid Nano highlighting: ""
 
+
+
 void example_test(int_forest_gen new_forest) {
     cout << "    example_test... ";
     int_forest_ptr forest = new_forest();
@@ -486,7 +488,30 @@ void test_everything(string const &name, int_forest_gen new_forest) {
     example_test(new_forest);
 }
 
+template<typename forest_type>
+void test_copy_constructors(string const &name, forest_type f0) {
+    cout << "Testing copy constructors in " << name << "..." << endl;
+    f0.create_vertex(2);
+    f0.create_vertex(3);
+    f0.scheduled_attach(0, 1, 2, 3);
+    f0.scheduled_apply();
+    ASSERT_EQUAL(2, f0.n_vertices());
+    ASSERT_EQUAL(1, f0.n_edges());
+    forest_type f1 = f0;
+    forest_type f2;
+    ASSERT_EQUAL(2, f1.n_vertices());
+    ASSERT_EQUAL(1, f1.n_edges());
+    ASSERT_EQUAL(0, f2.n_vertices());
+    ASSERT_EQUAL(0, f2.n_edges());
+    f2 = f0;
+    ASSERT_EQUAL(2, f2.n_vertices());
+    ASSERT_EQUAL(1, f2.n_edges());
+}
+
 int main() {
+    test_copy_constructors("naive forest", naive_rooted_dynforest<int, int>());
+    test_copy_constructors("sequential forest", rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
+
     test_everything("naive forest", []() -> shared_ptr<int_forest> {
         return shared_ptr<int_forest>(new naive_rooted_dynforest<int, int>());
     });
