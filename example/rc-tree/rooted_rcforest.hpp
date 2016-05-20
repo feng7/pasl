@@ -7,12 +7,12 @@
 
 #include <atomic>
 #include <algorithm>
-#include <chrono>
-#include <random>
 #include <vector>
 
 #include "rooted_dynforest.hpp"
+
 #include "dynamic_connectivity.hpp"
+#include "thread_local_random.hpp"
 
 // An implementation of the rooted dynamic forest based on RC-trees.
 template<
@@ -21,8 +21,7 @@ template<
     typename e_monoid_trait = monoid_plus<e_info_t>, // may be non-commutative
     typename v_monoid_trait = monoid_plus<v_info_t>, // should be commutative
     typename connectivity_t = dummy_checker,         // use "link_cut_tree" to turn on loop control
-    bool     has_debug_contraction = false,          // use "true" to check whether non-affected vertices are not affected
-    typename random_t       = std::default_random_engine
+    bool     has_debug_contraction = false           // use "true" to check whether non-affected vertices are not affected
 > class rooted_rcforest
     : public rooted_dynforest<e_info_t, v_info_t, e_monoid_trait, v_monoid_trait>
 {
@@ -137,11 +136,11 @@ template<
 
             bool is_changed;
 
-            bool get_random_bit(int level, random_t &rng) {
+            bool get_random_bit(int level) {
                 int v_index = level / bits_in_unsigned;
                 int b_index = level % bits_in_unsigned;
                 while ((int) random_bits.size() <= v_index) {
-                    random_bits.push_back((unsigned) rng());
+                    random_bits.push_back((unsigned) global_rng());
                 }
                 return ((random_bits[v_index] >> b_index) & 1) == 1;
             }
@@ -267,8 +266,6 @@ template<
 
         std::vector<vertex_col_t> vertices;
 
-        random_t rng;
-
         connectivity_t conn_checker;
 
         atomic_flag_vector atomic_flags;
@@ -280,15 +277,13 @@ template<
     public:
         rooted_rcforest(
             e_monoid_trait const &e_ops = e_monoid_trait(),
-            v_monoid_trait const &v_ops = v_monoid_trait(),
-            unsigned seed = (unsigned) (std::chrono::system_clock::now().time_since_epoch().count())
+            v_monoid_trait const &v_ops = v_monoid_trait()
         ) : e_ops(e_ops)
           , v_ops(v_ops)
           , edge_count(0)
           , scheduled_edge_count(0)
           , has_scheduled(false)
           , vertices()
-          , rng(seed)
           , conn_checker()
           , atomic_flags()
           , curr_modified()
@@ -304,7 +299,6 @@ template<
           , scheduled_edge_count(src.scheduled_edge_count)
           , has_scheduled(src.has_scheduled)
           , vertices(src.vertices)
-          , rng(src.rng)
           , conn_checker(src.conn_checker)
           , atomic_flags(src.atomic_flags)
           , curr_modified(src.curr_modified)
@@ -321,7 +315,6 @@ template<
             scheduled_edge_count = src.scheduled_edge_count;
             has_scheduled        = src.has_scheduled;
             vertices             = src.vertices;
-            rng                  = src.rng;
             conn_checker         = src.conn_checker;
             atomic_flags         = src.atomic_flags;
             curr_modified        = src.curr_modified;
@@ -584,7 +577,7 @@ template<
             link_col.right_index = -1; // of current vertex's siblings
             link_col.scheduled_left_index = -1;
             link_col.scheduled_right_index = -1;
-            link_col.heap_key = (int) (rng() >> 1); // a definitely positive random heap key
+            link_col.heap_key = (int) ((unsigned) (global_rng()) >> 1); // a definitely positive random heap key
             link_col.is_changed = false;
 
             link_col.at_level(0).insert_child(data_index);
@@ -885,9 +878,9 @@ template<
             vertex_t const &v = vertices[vertex].at_level(level);
             return v.children_count == 1
                 && v.parent != -1
-                && !vertices[vertex].get_random_bit(level, rng)
-                && vertices[v.parent].get_random_bit(level, rng)
-                && vertices[v.children[0]].get_random_bit(level, rng)
+                && !vertices[vertex].get_random_bit(level)
+                && vertices[v.parent].get_random_bit(level)
+                && vertices[v.children[0]].get_random_bit(level)
                 && !will_rake(level, v.children[0]);
         }
         bool will_accept_change(int level, int vertex) {
