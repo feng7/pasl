@@ -81,18 +81,6 @@ template<
             return *this;
         }
 
-        naive_rooted_dynforest &operator = (
-            naive_rooted_dynforest &&src
-        ) {
-            vertices             = src.vertices;
-            edge_count           = src.edge_count;
-            scheduled_edge_count = src.scheduled_edge_count;
-            has_scheduled        = src.has_scheduled;
-            e_ops                = src.e_ops;
-            v_ops                = src.v_ops;
-            return *this;
-        }
-
     // Access methods
     public:
         // Returns the number of vertices.

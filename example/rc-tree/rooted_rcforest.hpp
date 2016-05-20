@@ -5,6 +5,7 @@
 #   error "This header requires C++11"
 #endif
 
+#include <atomic>
 #include <chrono>
 #include <random>
 #include <unordered_set>
@@ -107,12 +108,13 @@ template<
             std::vector<vertex_t>   odd_levels;  // odd-even separation as a premature optimization
             std::vector<vertex_t>   even_levels; // for the parallel version
         public:
-            int                     last_live_level;
-            contract_t              contraction;
+            // The information about when and how this vertex disappears
+            int last_live_level;
+            contract_t contraction;
 
             // Children counts in the represented tree
-            int                     children_count;
-            int                     scheduled_children_count;
+            int children_count;
+            int scheduled_children_count;
 
             // The machinery for Cartesian trees
             // which store multiple children from the represented tree
@@ -123,7 +125,16 @@ template<
             int scheduled_right_index;
             int heap_key;
 
+            // Random bits for determining whether to compress
             std::vector<unsigned> random_bits;
+
+            // A place for storing vertices affected by this vertex's change
+            // Maximum possible: me + parent + parent's parent + 3 children = 6
+            int next_affected[6];
+            int next_affected_count;
+            int next_affected_check_parent;
+
+            bool is_changed;
 
             bool get_random_bit(int level, random_t &rng) {
                 int v_index = level / bits_in_unsigned;
@@ -180,6 +191,72 @@ template<
             }
         };
 
+        struct cache_line_int_t {
+            int data;
+        private:
+            int padding;
+        };
+
+        class atomic_flag_vector {
+            std::atomic_flag *data;
+            unsigned count, capacity;
+
+            void reset() {
+                for (unsigned i = 0; i < capacity; ++i) {
+                    data[i].clear();
+                }
+            }
+        public:
+            atomic_flag_vector()
+                : data(new std::atomic_flag[10])
+                , count(0)
+                , capacity(10)
+            {
+                reset();
+            }
+
+            atomic_flag_vector(atomic_flag_vector const &that)
+                : data(new std::atomic_flag[that.capacity])
+                , count(that.count)
+                , capacity(that.capacity)
+            {
+                reset();
+            }
+
+            atomic_flag_vector &operator = (atomic_flag_vector const &that) {
+                if (capacity < that.capacity) {
+                    delete[] data;
+                    capacity = that.capacity;
+                    data = new std::atomic_flag[capacity];
+                    reset();
+                }
+                count = that.count;
+                return *this;
+            }
+
+            std::atomic_flag &operator[] (unsigned index) {
+                return data[index];
+            }
+
+            unsigned size() const {
+                return count;
+            }
+
+            void insert_element() {
+                if (count == capacity) {
+                    delete[] data;
+                    capacity *= 2;
+                    data = new std::atomic_flag[capacity];
+                    reset();
+                }
+                ++count;
+            }
+
+            ~atomic_flag_vector() {
+                delete[] data;
+            }
+        };
+
         e_monoid_trait  e_ops;
         v_monoid_trait  v_ops;
 
@@ -193,6 +270,11 @@ template<
         random_t rng;
 
         connectivity_t conn_checker;
+
+        atomic_flag_vector atomic_flags;
+        std::vector<cache_line_int_t> curr_modified;
+        std::vector<cache_line_int_t> next_modified;
+        int n_modified;
 
     // Constructors
     public:
@@ -209,6 +291,10 @@ template<
           , changed_vertices()
           , rng(seed)
           , conn_checker()
+          , atomic_flags()
+          , curr_modified()
+          , next_modified()
+          , n_modified(0)
         {}
 
         rooted_rcforest(
@@ -222,6 +308,10 @@ template<
           , changed_vertices(src.changed_vertices)
           , rng(src.rng)
           , conn_checker(src.conn_checker)
+          , atomic_flags(src.atomic_flags)
+          , curr_modified(src.curr_modified)
+          , next_modified(src.next_modified)
+          , n_modified(src.n_modified)
         {}
 
         rooted_rcforest &operator = (
@@ -236,21 +326,10 @@ template<
             changed_vertices     = src.changed_vertices;
             rng                  = src.rng;
             conn_checker         = src.conn_checker;
-            return *this;
-        }
-
-        rooted_rcforest &operator = (
-            rooted_rcforest &&src
-        ) {
-            e_ops                = src.e_ops;
-            v_ops                = src.v_ops;
-            edge_count           = src.edge_count;
-            scheduled_edge_count = src.scheduled_edge_count;
-            has_scheduled        = src.has_scheduled;
-            vertices             = src.vertices;
-            changed_vertices     = src.changed_vertices;
-            rng                  = src.rng;
-            conn_checker         = src.conn_checker;
+            atomic_flags         = src.atomic_flags;
+            curr_modified        = src.curr_modified;
+            next_modified        = src.next_modified;
+            n_modified           = src.n_modified;
             return *this;
         }
 
@@ -494,6 +573,7 @@ template<
             data_col.scheduled_left_index = -1;
             data_col.scheduled_right_index = -1;
             data_col.heap_key = -1; // heap key of data colums should be the minimum possible
+            data_col.is_changed = false;
 
             link_col.last_live_level = -1;
             link_col.push_level(link_vertex);
@@ -508,6 +588,7 @@ template<
             link_col.scheduled_left_index = -1;
             link_col.scheduled_right_index = -1;
             link_col.heap_key = (int) (rng() >> 1); // a definitely positive random heap key
+            link_col.is_changed = false;
 
             link_col.at_level(0).insert_child(data_index);
             link_col.at_level(1).insert_child(data_index);
@@ -515,6 +596,14 @@ template<
             data_col.at_level(1).parent = link_index;
 
             conn_checker.create_vertex();
+
+            atomic_flags.insert_element();
+            atomic_flags.insert_element();
+
+            curr_modified.push_back(cache_line_int_t());
+            curr_modified.push_back(cache_line_int_t());
+            next_modified.push_back(cache_line_int_t());
+            next_modified.push_back(cache_line_int_t());
 
             return data_index / 2;
         }
