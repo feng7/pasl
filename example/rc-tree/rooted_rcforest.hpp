@@ -586,6 +586,9 @@ template<
             data_col.at_level(0).parent = link_index;
             data_col.at_level(1).parent = link_index;
 
+            data_col.get_random_bit(1);
+            link_col.get_random_bit(2);
+
             conn_checker.create_vertex();
 
             atomic_flags.insert_element();
@@ -1024,6 +1027,7 @@ template<
 
         void fetch_parent_uniquify_vertices(int level, int vertex) {
             vertex_col_t &vx = vertices[vertex];
+            vx.get_random_bit(level);
             if (vx.next_affected_check_parent != -1) {
                 int child = vx.next_affected[vx.next_affected_check_parent];
                 int parent = vertices[child].at_level(level).parent;
@@ -1168,14 +1172,14 @@ template<
 
             if (n_modified > 0) {
                 if (has_debug_contraction) {
-                    for (unsigned i = 0; i < vertices.size(); ++i) {
+                    driver.loop_for(0, vertices.size(), [this](int i) -> void {
                         vertex_col_t &col = vertices[i];
                         col.is_changed = false;
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
                         col.children_count = col.scheduled_children_count;
-                    }
+                    });
                 } else {
                     driver.loop_for(0, n_modified, [this](int i) -> void {
                         vertex_col_t &col = vertices[curr_modified[i].data];
@@ -1195,16 +1199,15 @@ template<
                         curr_affected.push_back(curr_modified[i].data);
                     }
                     std::sort(curr_affected.begin(), curr_affected.end());
-                    for (unsigned i = 0; i < vertices.size(); ++i) {
-                        if (vertices[i].last_live_level < level) {
-                            continue;
-                        }
-                        if (process_vertex(level, i)) {
-                            if (!binary_search(curr_affected.begin(), curr_affected.end(), i)) {
-                                throw std::logic_error("[rooted_rcforest::scheduled_apply] A non-affected vertex changed!");
+                    driver.loop_for(0, vertices.size(), [this, level, curr_affected](int i) -> void {
+                        if (vertices[i].last_live_level >= level) {
+                            if (process_vertex(level, i)) {
+                                if (!binary_search(curr_affected.begin(), curr_affected.end(), i)) {
+                                    throw std::logic_error("[rooted_rcforest::scheduled_apply] A non-affected vertex changed!");
+                                }
                             }
                         }
-                    }
+                    });
                 } else {
                     driver.loop_for(0, n_modified, [this, level](int i) -> void {
                         process_vertex(level, curr_modified[i].data);

@@ -10,6 +10,7 @@
 #include "naive_rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
 #include "looping_driver_seq.hpp"
+#include "looping_driver_openmp.hpp"
 
 using std::cout;
 using std::endl;
@@ -244,40 +245,26 @@ int main() {
             int, int, looping_driver_seq, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
         >());
     };
+    auto openmp = []() -> shared_ptr<int_forest> {
+        return shared_ptr<int_forest>(new rooted_rcforest<
+            int, int, looping_driver_openmp, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
+        >());
+    };
 
-    cout << "6 vertices 100 operations" << endl;
-    cout << "  Starting naive vs naive..." << endl;
-    stress_testing(6, 100, naive, naive);
-    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
-    stress_testing(6, 100, naive, seq);
-    cout << "    done!" << endl;
+    int vertices[]   = {6, 10, 10, 10, 100};
+    int operations[] = {100, 200, 10000, 100000, 10000};
 
-    cout << "10 vertices 200 operations" << endl;
-    cout << "  Starting naive vs naive..." << endl;
-    stress_testing(10, 200, naive, naive);
-    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
-    stress_testing(10, 200, naive, seq);
-    cout << "    done!" << endl;
-
-    cout << "10 vertices 10000 operations" << endl;
-    cout << "  Starting naive vs naive..." << endl;
-    stress_testing(10, 10000, naive, naive);
-    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
-    stress_testing(10, 10000, naive, seq);
-    cout << "    done!" << endl;
-
-    cout << "10 vertices 100000 operations" << endl;
-    cout << "  Starting naive vs naive..." << endl;
-    stress_testing(10, 100000, naive, naive);
-    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
-    stress_testing(10, 100000, naive, seq);
-    cout << "    done!" << endl;
-
-    cout << "100 vertices 10000 operations" << endl;
-    cout << "  Starting naive vs naive..." << endl;
-    stress_testing(100, 10000, naive, naive);
-    cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
-    stress_testing(100, 10000, naive, seq);
-    cout << "    done!" << endl;
+    for (int r = 0; r < 5; ++r) {
+        int vv = vertices[r];
+        int oo = operations[r];
+        cout << vv << " vertices " << oo << " operations" << endl;
+        cout << "  Starting naive vs naive..." << endl;
+        stress_testing(vv, oo, naive, naive);
+        cout << "    done!" << endl << "  Starting naive vs sequential..." << endl;;
+        stress_testing(vv, oo, naive, seq);
+        cout << "    done!" << endl << "  Starting naive vs OpenMP..." << endl;;
+        stress_testing(vv, oo, naive, openmp);
+        cout << "    done!" << endl;
+    }
     return 0;
 }

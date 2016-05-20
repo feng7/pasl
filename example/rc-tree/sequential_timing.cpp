@@ -7,6 +7,7 @@
 #include "rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
 #include "looping_driver_seq.hpp"
+#include "looping_driver_openmp.hpp"
 
 using std::clock;
 using std::clock_t;
@@ -15,8 +16,7 @@ using std::endl;
 using std::function;
 using std::string;
 
-using int_forest = rooted_rcforest<int, int, looping_driver_seq>;
-
+template<typename int_forest>
 void timed_scheduled_apply(int_forest &forest) {
     clock_t start_time = clock();
     forest.scheduled_apply();
@@ -24,6 +24,7 @@ void timed_scheduled_apply(int_forest &forest) {
     cout << "    scheduled_apply: " << ((double) (end_time - start_time) / CLOCKS_PER_SEC) << " sec" << endl;
 }
 
+template<typename int_forest>
 void long_chain(int size) {
     int_forest forest;
     for (int i = 0; i < size; ++i) {
@@ -45,6 +46,7 @@ void long_chain(int size) {
     }
 }
 
+template<typename int_forest>
 void large_degree(int size) {
     int_forest forest;
     for (int i = 0; i < size; ++i) {
@@ -74,6 +76,7 @@ void large_degree(int size) {
     }
 }
 
+template<typename int_forest>
 void two_large_degrees(int size) {
     size &= ~1;
     int_forest forest;
@@ -109,6 +112,7 @@ void two_large_degrees(int size) {
     }
 }
 
+template<typename int_forest>
 void incremental_long_chain(int size) {
     int num_rounds = 10;
     size -= size % num_rounds;
@@ -156,10 +160,20 @@ void timing(string name, function<void(int)> callee) {
     }
 }
 
+using if_seq = rooted_rcforest<int, int, looping_driver_seq>;
+using if_omp = rooted_rcforest<int, int, looping_driver_openmp>;
+
 int main() {
-    timing("long chain", [](int size) -> void { long_chain(size); });
-    timing("large degree", [](int size) -> void { large_degree(size); });
-    timing("two large degrees", [](int size) -> void { two_large_degrees(size); });
-    timing("incremental long chain", [](int size) -> void { incremental_long_chain(size); });
+    timing("long chain (seq)",    [](int size) -> void { long_chain<if_seq>(size); });
+    timing("long chain (OpenMP)", [](int size) -> void { long_chain<if_omp>(size); });
+
+    timing("large degree (seq)",    [](int size) -> void { large_degree<if_seq>(size); });
+    timing("large degree (OpenMP)", [](int size) -> void { large_degree<if_omp>(size); });
+
+    timing("two large degrees (seq)",    [](int size) -> void { two_large_degrees<if_seq>(size); });
+    timing("two large degrees (OpenMP)", [](int size) -> void { two_large_degrees<if_omp>(size); });
+
+    timing("incremental long chain (seq)",    [](int size) -> void { incremental_long_chain<if_seq>(size); });
+    timing("incremental long chain (OpenMP)", [](int size) -> void { incremental_long_chain<if_omp>(size); });
     return 0;
 }

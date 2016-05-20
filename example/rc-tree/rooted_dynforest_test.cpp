@@ -9,6 +9,7 @@
 #include "naive_rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
 #include "looping_driver_seq.hpp"
+#include "looping_driver_openmp.hpp"
 
 using std::cout;
 using std::endl;
@@ -492,10 +493,10 @@ void test_everything(string const &name, int_forest_gen new_forest) {
 template<typename forest_type>
 void test_copy_constructors(string const &name, forest_type f0) {
     cout << "Testing copy constructors in " << name << "..." << endl;
-    f0.create_vertex(2);
-    f0.create_vertex(3);
-    f0.scheduled_attach(0, 1, 2, 3);
-    f0.scheduled_apply();
+    ASSERT_NOTHROW(f0.create_vertex(2));
+    ASSERT_NOTHROW(f0.create_vertex(3));
+    ASSERT_NOTHROW(f0.scheduled_attach(0, 1, 2, 3));
+    ASSERT_NOTHROW(f0.scheduled_apply());
     ASSERT_EQUAL(2, f0.n_vertices());
     ASSERT_EQUAL(1, f0.n_edges());
     forest_type f1 = f0;
@@ -514,6 +515,9 @@ int main() {
     test_copy_constructors("sequential forest", rooted_rcforest<
         int, int, looping_driver_seq, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
     >());
+    test_copy_constructors("OpenMP forest", rooted_rcforest<
+        int, int, looping_driver_openmp, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
+    >());
 
     test_everything("naive forest", []() -> shared_ptr<int_forest> {
         return shared_ptr<int_forest>(new naive_rooted_dynforest<int, int>());
@@ -523,6 +527,11 @@ int main() {
             int, int, looping_driver_seq, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
         >());
     });
+    test_everything("OpenMP forest", []() -> shared_ptr<int_forest> {
+        return shared_ptr<int_forest>(new rooted_rcforest<
+            int, int, looping_driver_openmp, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
+        >());
+    });
 
     test_matrix("naive forest with matrix info", []() -> shared_ptr<matrix_forest> {
         return shared_ptr<matrix_forest>(new naive_rooted_dynforest<matrix, int>());
@@ -530,6 +539,11 @@ int main() {
     test_matrix("sequential forest with matrix info", []() -> shared_ptr<matrix_forest> {
         return shared_ptr<matrix_forest>(new rooted_rcforest<
             matrix, int, looping_driver_seq, monoid_plus<matrix>, monoid_plus<int>, link_cut_tree, true
+        >());
+    });
+    test_matrix("OpenMP forest with matrix info", []() -> shared_ptr<matrix_forest> {
+        return shared_ptr<matrix_forest>(new rooted_rcforest<
+            matrix, int, looping_driver_openmp, monoid_plus<matrix>, monoid_plus<int>, link_cut_tree, true
         >());
     });
     return 0;
