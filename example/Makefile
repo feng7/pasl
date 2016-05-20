@@ -27,7 +27,7 @@ USE_FATAL_ERRORS=1
 VERBOSE_MAKE=0
 VERBOSE_DEPENDENCIES=0
 
-PROGRAMS=pasl_timing.cpp
+PROGRAMS=timing_pasl.cpp
 	#fib.cpp \
 	#hull.cpp \
 	#bhut.cpp \

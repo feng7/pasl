@@ -45,29 +45,16 @@ elif [[ "$1" == "perf" ]]; then
 
     g++ -std=c++11 -O3 -Wall -Wextra -fopenmp -ltcmalloc -o main \
         dynamic_connectivity.cpp \
-        sequential_timing.cpp \
         thread_local_random.cpp \
-        looping_driver_seq.cpp looping_driver_openmp.cpp
+        looping_driver_$2.cpp timing_$2.cpp
 
-    if [[ "$2" == "" ]]; then
+    if [[ "$3" == "" ]]; then
         ./main
     else
-        OMP_NUM_THREADS=$2 ./main
+        OMP_NUM_THREADS=$3 ./main
     fi
     rm main
 
-elif [[ "$1" == "prof" ]]; then
-
-    g++ -std=c++11 -pg -O3 -Wall -Wextra -fopenmp -ltcmalloc -o main \
-        dynamic_connectivity.cpp \
-        sequential_timing.cpp \
-        thread_local_random.cpp \
-        looping_driver_seq.cpp looping_driver_openmp.cpp
-
-    ./main
-    gprof main gmon.out > gmon.txt
-    rm main gmon.out
-
 else
-    echo "Expected one of the options as the first argument: 'test', 'perf', 'prof', found '$1'"
+    echo "Expected one of the options as the first argument: 'test', 'perf' [seq|openmp|pasl], found '$1'"
 fi

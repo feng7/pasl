@@ -8,11 +8,6 @@
 
 #include "rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
-#include "looping_driver_seq.hpp"
-#include "looping_driver_openmp.hpp"
-#include "looping_driver_pasl.hpp"
-
-#include "benchmark.hpp"
 
 using std::clock;
 using std::clock_t;
@@ -175,31 +170,4 @@ void timing(string name, function<void(int)> callee) {
 
         cout << "    Total time " << ((double) (end_time - start_time) / CLOCKS_PER_SEC) << " sec" << endl;
     }
-}
-
-using if_seq  = rooted_rcforest<int, int, looping_driver_seq>;
-using if_omp  = rooted_rcforest<int, int, looping_driver_openmp>;
-using if_pasl = rooted_rcforest<int, int, looping_driver_pasl>;
-
-int main() {
-    timing("long chain (seq)",                [](int size) -> void { long_chain<if_seq>(size); });
-    timing("large degree (seq)",              [](int size) -> void { large_degree<if_seq>(size); });
-    timing("two large degrees (seq)",         [](int size) -> void { two_large_degrees<if_seq>(size); });
-    timing("incremental long chain (seq)",    [](int size) -> void { incremental_long_chain<if_seq>(size); });
-
-    timing("long chain (OpenMP)",             [](int size) -> void { long_chain<if_omp>(size); });
-    timing("large degree (OpenMP)",           [](int size) -> void { large_degree<if_omp>(size); });
-    timing("two large degrees (OpenMP)",      [](int size) -> void { two_large_degrees<if_omp>(size); });
-    timing("incremental long chain (OpenMP)", [](int size) -> void { incremental_long_chain<if_omp>(size); });
-
-    auto empty = [] {};
-    auto pasl_run = [&] (bool sequential) {
-        timing("long chain (PASL)",             [](int size) -> void { long_chain<if_pasl>(size); });
-        timing("large degree (PASL)",           [](int size) -> void { large_degree<if_pasl>(size); });
-        timing("two large degrees (PASL)",      [](int size) -> void { two_large_degrees<if_pasl>(size); });
-        timing("incremental long chain (PASL)", [](int size) -> void { incremental_long_chain<if_pasl>(size); });
-    };
-    pasl::sched::launch(argc, argv, init, run, output, destroy);
-
-    return 0;
 }
