@@ -3,7 +3,7 @@
 if [[ "$1" == "test" ]]; then
 
     g++ -std=c++11 -O3 -Wall -Wextra -o test-dc \
-        dc/dynamic_connectivity_tests.cpp dc/dynamic_connectivity.cpp
+        dynamic_connectivity_tests.cpp dynamic_connectivity.cpp
 
     ./test-dc
     EXITCODE=$?
@@ -14,7 +14,7 @@ if [[ "$1" == "test" ]]; then
     fi
 
     g++ -std=c++11 -O3 -Wall -Wextra -o main \
-        rooted_dynforest_test.cpp dc/dynamic_connectivity.cpp
+        rooted_dynforest_test.cpp dynamic_connectivity.cpp
 
     ./main
     EXITCODE=$?
@@ -25,7 +25,7 @@ if [[ "$1" == "test" ]]; then
     fi
 
     g++ -std=c++11 -O3 -Wall -Wextra -o main \
-        stress_test.cpp dc/dynamic_connectivity.cpp
+        stress_test.cpp dynamic_connectivity.cpp
 
     ./main
     EXITCODE=$?
@@ -38,7 +38,7 @@ if [[ "$1" == "test" ]]; then
 elif [[ "$1" == "perf" ]]; then
 
     g++ -std=c++11 -O3 -Wall -Wextra -o main \
-        dc/dynamic_connectivity.cpp sequential_timing.cpp
+        dynamic_connectivity.cpp sequential_timing.cpp
 
     ./main
     rm main
@@ -46,7 +46,7 @@ elif [[ "$1" == "perf" ]]; then
 elif [[ "$1" == "prof" ]]; then
 
     g++ -std=c++11 -pg -O3 -Wall -Wextra -o main \
-        dc/dynamic_connectivity.cpp sequential_timing.cpp
+        dynamic_connectivity.cpp sequential_timing.cpp
 
     ./main
     gprof main gmon.out > gmon.txt

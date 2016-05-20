@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "rooted_dynforest.hpp"
-#include "dc/dynamic_connectivity.hpp"
+#include "dynamic_connectivity.hpp"
 
 // An implementation of the rooted dynamic forest based on RC-trees.
 template<
