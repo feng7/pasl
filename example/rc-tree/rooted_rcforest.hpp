@@ -6,9 +6,9 @@
 #endif
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <random>
-#include <unordered_set>
 #include <vector>
 
 #include "rooted_dynforest.hpp"
@@ -133,6 +133,7 @@ template<
             int next_affected[6];
             int next_affected_count;
             int next_affected_check_parent;
+            int next_affected_prefix_sum;
 
             bool is_changed;
 
@@ -265,7 +266,6 @@ template<
         bool has_scheduled;
 
         std::vector<vertex_col_t> vertices;
-        std::unordered_set<int>   changed_vertices;
 
         random_t rng;
 
@@ -274,7 +274,7 @@ template<
         atomic_flag_vector atomic_flags;
         std::vector<cache_line_int_t> curr_modified;
         std::vector<cache_line_int_t> next_modified;
-        int n_modified;
+        unsigned n_modified;
 
     // Constructors
     public:
@@ -288,7 +288,6 @@ template<
           , scheduled_edge_count(0)
           , has_scheduled(false)
           , vertices()
-          , changed_vertices()
           , rng(seed)
           , conn_checker()
           , atomic_flags()
@@ -305,7 +304,6 @@ template<
           , scheduled_edge_count(src.scheduled_edge_count)
           , has_scheduled(src.has_scheduled)
           , vertices(src.vertices)
-          , changed_vertices(src.changed_vertices)
           , rng(src.rng)
           , conn_checker(src.conn_checker)
           , atomic_flags(src.atomic_flags)
@@ -323,7 +321,6 @@ template<
             scheduled_edge_count = src.scheduled_edge_count;
             has_scheduled        = src.has_scheduled;
             vertices             = src.vertices;
-            changed_vertices     = src.changed_vertices;
             rng                  = src.rng;
             conn_checker         = src.conn_checker;
             atomic_flags         = src.atomic_flags;
@@ -614,6 +611,7 @@ template<
             if (!has_scheduled) {
                 has_scheduled = true;
                 scheduled_edge_count = edge_count;
+                n_modified = 0;
             }
         }
 
@@ -622,10 +620,10 @@ template<
                 throw std::logic_error("[rooted_rcforest::ensure_internal_vertex_is_changed] vertex is -1");
             }
             ensure_has_scheduled();
-            if (changed_vertices.count(vertex) == 0) {
-                changed_vertices.insert(vertex);
-                vertex_col_t &vx = vertices[vertex];
-
+            vertex_col_t &vx = vertices[vertex];
+            if (!vx.is_changed) {
+                curr_modified[n_modified++].data = vertex;
+                vx.is_changed = true;
                 vx.at_level(0) = vx.at_level(1);
                 vx.scheduled_left_index = vx.left_index;
                 vx.scheduled_right_index = vx.right_index;
@@ -973,54 +971,80 @@ template<
             }
         }
 
-        void process_changed_vertex(int level, int vertex, std::unordered_set<int> &next_affected, std::unordered_set<int> &parent_affected) {
-            next_affected.insert(vertex);
+        void process_changed_vertex(int level, int vertex) {
             // The current vertex V is ready and readable by this thread.
             // No other vertex from this level is readable nor ready.
             // Everything from "level - 1" is accessible.
+            vertex_col_t &vx = vertices[vertex];
             vertex_t &new_vx = vertices[vertex].at_level(level);
+            vx.next_affected[vx.next_affected_count++] = vertex;
 
             if (new_vx.parent != -1) {
-                // A parent P can definitely be affected.
-                next_affected.insert(new_vx.parent);
-                parent_affected.insert(new_vx.parent);
+                // The parent of parent, if exists, can definitely be accepted.
+                // We don't know who it is yet, so we mark this like this.
+                vx.next_affected_check_parent = vx.next_affected_count;
+                // The parent can definitely be affected.
+                vx.next_affected[vx.next_affected_count++] = new_vx.parent;
             }
 
             for (int i = 0; i < new_vx.children_count; ++i) {
                 // Every child can technically be affected (e.g. all but one children are fresh new ones,
                 // and V used to compress with the remaining one)
-                next_affected.insert(new_vx.children[i]);
+                vx.next_affected[vx.next_affected_count++] = new_vx.children[i];
             }
         }
 
-        bool process_vertex(int level, int vertex, std::unordered_set<int> &next_affected, std::unordered_set<int> &parent_affected) {
+        bool process_vertex(int level, int vertex) {
+            vertex_col_t &vx = vertices[vertex];
+            vx.next_affected_count = 0;
+            vx.next_affected_prefix_sum = 0;
+            vx.next_affected_check_parent = -1;
             if (will_become_root(level, vertex)) {
                 if (do_become_root(level, vertex)) {
                     return true;
                 }
             } else if (will_rake(level, vertex)) {
                 if (do_rake(level, vertex)) {
-                    next_affected.insert(vertices[vertex].at_level(level).parent);
+                    vx.next_affected[vx.next_affected_count++] = vx.at_level(level).parent;
                     return true;
                 }
             } else if (will_compress(level, vertex)) {
                 if (do_compress(level, vertex)) {
-                    next_affected.insert(vertices[vertex].at_level(level).parent);
-                    next_affected.insert(vertices[vertex].at_level(level).children[0]);
+                    vx.next_affected[vx.next_affected_count++] = vx.at_level(level).parent;
+                    vx.next_affected[vx.next_affected_count++] = vx.at_level(level).children[0];
                     return true;
                 }
             } else if (will_accept_change(level, vertex)) {
                 if (do_accept_change(level, vertex)) {
-                    process_changed_vertex(level + 1, vertex, next_affected, parent_affected);
+                    process_changed_vertex(level + 1, vertex);
                     return true;
                 }
             } else {
                 if (do_copy_paste(level, vertex)) {
-                    process_changed_vertex(level + 1, vertex, next_affected, parent_affected);
+                    process_changed_vertex(level + 1, vertex);
                     return true;
                 }
             }
             return false;
+        }
+
+        void fetch_parent_uniquify_vertices(int level, int vertex) {
+            vertex_col_t &vx = vertices[vertex];
+            if (vx.next_affected_check_parent != -1) {
+                int child = vx.next_affected[vx.next_affected_check_parent];
+                int parent = vertices[child].at_level(level).parent;
+                if (parent != -1) {
+                    vx.next_affected[vx.next_affected_count++] = parent;
+                }
+            }
+            int affected_count = vx.next_affected_count;
+            vx.next_affected_count = 0;
+            for (int i = 0; i < affected_count; ++i) {
+                if (!atomic_flags[vx.next_affected[i]].test_and_set()) {
+                    // This vertex was not claimed by anyone else
+                    vx.next_affected[vx.next_affected_count++] = vx.next_affected[i];
+                }
+            }
         }
 
     // Scheduled modification methods.
@@ -1030,7 +1054,7 @@ template<
             if (vertex < 0 || vertex >= n_vertices()) {
                 throw std::invalid_argument("[rooted_rcforest::scheduled_is_changed] Invalid argument");
             }
-            return changed_vertices.count(2 * vertex) != 0;
+            return vertices[2 * vertex].is_changed;
         }
 
         // Returns the parent of the given vertex after all scheduled changes are applied.
@@ -1040,7 +1064,7 @@ template<
             }
             int vx = 2 * vertex + 1;
             while (vx != -1 && (vx & 1) == 1) {
-                if (changed_vertices.count(vx) != 0) {
+                if (vertices[vx].is_changed) {
                     vx = vertices[vx].at_level(0).parent;
                 } else {
                     vx = vertices[vx].at_level(1).parent;
@@ -1146,22 +1170,21 @@ template<
 
         // Applies all pending changes.
         virtual void scheduled_apply() {
-            std::unordered_set<int> &curr_affected = changed_vertices;
-            std::unordered_set<int> next_affected;
-            std::unordered_set<int> parent_affected;
-
-            if (curr_affected.size() > 0) {
+            if (n_modified > 0) {
                 if (has_debug_contraction) {
-                    for (int i = 0; i < (int) vertices.size(); ++i) {
+                    for (unsigned i = 0; i < vertices.size(); ++i) {
                         vertex_col_t &col = vertices[i];
+                        col.is_changed = false;
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
                         col.children_count = col.scheduled_children_count;
                     }
                 } else {
-                    for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
-                        vertex_col_t &col = vertices[*itr];
+                    // TODO: parallel loop
+                    for (unsigned i = 0; i < n_modified; ++i) {
+                        vertex_col_t &col = vertices[curr_modified[i].data];
+                        col.is_changed = false;
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
@@ -1170,34 +1193,54 @@ template<
                 }
             }
 
-            for (int level = 1; curr_affected.size() > 0; ++level, std::swap(curr_affected, next_affected)) {
-                next_affected.clear();
+            for (int level = 1; n_modified > 0; ++level, std::swap(curr_modified, next_modified)) {
                 if (has_debug_contraction) {
-                    for (int i = 0; i < (int) vertices.size(); ++i) {
+                    std::vector<unsigned> curr_affected;
+                    for (unsigned i = 0; i < n_modified; ++i) {
+                        curr_affected.push_back(curr_modified[i].data);
+                    }
+                    std::sort(curr_affected.begin(), curr_affected.end());
+                    for (unsigned i = 0; i < vertices.size(); ++i) {
                         if (vertices[i].last_live_level < level) {
                             continue;
                         }
-                        if (process_vertex(level, i, next_affected, parent_affected)) {
-                            if (curr_affected.count(i) == 0) {
+                        if (process_vertex(level, i)) {
+                            if (!binary_search(curr_affected.begin(), curr_affected.end(), i)) {
                                 throw std::logic_error("[rooted_rcforest::scheduled_apply] A non-affected vertex changed!");
                             }
                         }
                     }
                 } else {
-                    for (auto itr = curr_affected.begin(); itr != curr_affected.end(); ++itr) {
-                        process_vertex(level, *itr, next_affected, parent_affected);
+                    // TODO: parallel loop
+                    for (unsigned i = 0; i < n_modified; ++i) {
+                        process_vertex(level, curr_modified[i].data);
                     }
                 }
-                for (auto itr = parent_affected.begin(); itr != parent_affected.end(); ++itr) {
-                    vertex_col_t const &vc = vertices[*itr];
-                    if (vc.last_live_level > level) {
-                        int parent = vc.at_level(level + 1).parent;
-                        if (parent != -1) {
-                            next_affected.insert(parent);
-                        }
+                // TODO: parallel loop
+                for (unsigned i = 0; i < n_modified; ++i) {
+                    fetch_parent_uniquify_vertices(level + 1, curr_modified[i].data);
+                }
+                // TODO: make it an (inclusive) parallel prefix sum
+                for (unsigned i = 0; i < n_modified; ++i) {
+                    vertex_col_t &curr_v = vertices[curr_modified[i].data];
+                    if (i == 0) {
+                        curr_v.next_affected_prefix_sum = curr_v.next_affected_count;
+                    } else {
+                        vertex_col_t &prev_v = vertices[curr_modified[i - 1].data];
+                        curr_v.next_affected_prefix_sum = prev_v.next_affected_prefix_sum + curr_v.next_affected_count;
                     }
                 }
-                parent_affected.clear();
+                unsigned new_n_modified = vertices[curr_modified[n_modified - 1].data].next_affected_prefix_sum;
+                // TODO: parallel loop
+                for (unsigned i = 0; i < n_modified; ++i) {
+                    vertex_col_t &vx = vertices[curr_modified[i].data];
+                    int offset = vx.next_affected_prefix_sum - vx.next_affected_count;
+                    for (int j = 0; j < vx.next_affected_count; ++j) {
+                        next_modified[j + offset].data = vx.next_affected[j];
+                        atomic_flags[vx.next_affected[j]].clear();
+                    }
+                }
+                n_modified = new_n_modified;
             }
             edge_count = scheduled_edge_count;
             conn_checker.flush();
@@ -1209,7 +1252,16 @@ template<
             scheduled_edge_count = edge_count;
             conn_checker.unroll();
             has_scheduled = false;
-            changed_vertices.clear();
+            // TODO: maybe also a parallel loop?
+            for (unsigned i = 0; i < n_modified; ++i) {
+                vertex_col_t &col = vertices[curr_modified[i].data];
+                col.is_changed = false;
+                col.at_level(0) = col.at_level(1);
+                col.scheduled_left_index = col.left_index;
+                col.scheduled_right_index = col.right_index;
+                col.scheduled_children_count = col.children_count;
+            }
+            n_modified = 0;
         }
 
     // A necessary virtual destructor
