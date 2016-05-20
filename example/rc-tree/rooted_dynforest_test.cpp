@@ -8,6 +8,7 @@
 #include "rooted_dynforest.hpp"
 #include "naive_rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
+#include "looping_driver_seq.hpp"
 
 using std::cout;
 using std::endl;
@@ -510,20 +511,26 @@ void test_copy_constructors(string const &name, forest_type f0) {
 
 int main() {
     test_copy_constructors("naive forest", naive_rooted_dynforest<int, int>());
-    test_copy_constructors("sequential forest", rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
+    test_copy_constructors("sequential forest", rooted_rcforest<
+        int, int, looping_driver_seq, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
+    >());
 
     test_everything("naive forest", []() -> shared_ptr<int_forest> {
         return shared_ptr<int_forest>(new naive_rooted_dynforest<int, int>());
     });
     test_everything("sequential forest", []() -> shared_ptr<int_forest> {
-        return shared_ptr<int_forest>(new rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
+        return shared_ptr<int_forest>(new rooted_rcforest<
+            int, int, looping_driver_seq, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
+        >());
     });
 
     test_matrix("naive forest with matrix info", []() -> shared_ptr<matrix_forest> {
         return shared_ptr<matrix_forest>(new naive_rooted_dynforest<matrix, int>());
     });
     test_matrix("sequential forest with matrix info", []() -> shared_ptr<matrix_forest> {
-        return shared_ptr<matrix_forest>(new rooted_rcforest<matrix, int, monoid_plus<matrix>, monoid_plus<int>, link_cut_tree, true>());
+        return shared_ptr<matrix_forest>(new rooted_rcforest<
+            matrix, int, looping_driver_seq, monoid_plus<matrix>, monoid_plus<int>, link_cut_tree, true
+        >());
     });
     return 0;
 }

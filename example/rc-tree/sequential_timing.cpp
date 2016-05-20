@@ -6,6 +6,7 @@
 
 #include "rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
+#include "looping_driver_seq.hpp"
 
 using std::clock;
 using std::clock_t;
@@ -14,7 +15,9 @@ using std::endl;
 using std::function;
 using std::string;
 
-void timed_scheduled_apply(rooted_rcforest<int, int> &forest) {
+using int_forest = rooted_rcforest<int, int, looping_driver_seq>;
+
+void timed_scheduled_apply(int_forest &forest) {
     clock_t start_time = clock();
     forest.scheduled_apply();
     clock_t end_time = clock();
@@ -22,7 +25,7 @@ void timed_scheduled_apply(rooted_rcforest<int, int> &forest) {
 }
 
 void long_chain(int size) {
-    rooted_rcforest<int, int> forest;
+    int_forest forest;
     for (int i = 0; i < size; ++i) {
         forest.create_vertex(1);
     }
@@ -43,7 +46,7 @@ void long_chain(int size) {
 }
 
 void large_degree(int size) {
-    rooted_rcforest<int, int> forest;
+    int_forest forest;
     for (int i = 0; i < size; ++i) {
         forest.create_vertex(1);
     }
@@ -73,7 +76,7 @@ void large_degree(int size) {
 
 void two_large_degrees(int size) {
     size &= ~1;
-    rooted_rcforest<int, int> forest;
+    int_forest forest;
     for (int i = 0; i < size; ++i) {
         forest.create_vertex(1);
     }
@@ -110,7 +113,7 @@ void incremental_long_chain(int size) {
     int num_rounds = 10;
     size -= size % num_rounds;
     int round_size = size / num_rounds;
-    rooted_rcforest<int, int> forest;
+    int_forest forest;
     for (int round = 0; round < num_rounds; ++round) {
         int previous_size = forest.n_vertices();
         for (int i = 0; i < round_size; ++i) {

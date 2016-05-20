@@ -9,6 +9,7 @@
 #include "rooted_dynforest.hpp"
 #include "naive_rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
+#include "looping_driver_seq.hpp"
 
 using std::cout;
 using std::endl;
@@ -239,7 +240,9 @@ int main() {
         return shared_ptr<int_forest>(new naive_rooted_dynforest<int, int>());
     };
     auto seq = []() -> shared_ptr<int_forest> {
-        return shared_ptr<int_forest>(new rooted_rcforest<int, int, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true>());
+        return shared_ptr<int_forest>(new rooted_rcforest<
+            int, int, looping_driver_seq, monoid_plus<int>, monoid_plus<int>, link_cut_tree, true
+        >());
     };
 
     cout << "6 vertices 100 operations" << endl;

@@ -18,6 +18,7 @@
 template<
     typename e_info_t,
     typename v_info_t,
+    typename looping_driver_t,                       // see looping_driver_*.hpp for interface
     typename e_monoid_trait = monoid_plus<e_info_t>, // may be non-commutative
     typename v_monoid_trait = monoid_plus<v_info_t>, // should be commutative
     typename connectivity_t = dummy_checker,         // use "link_cut_tree" to turn on loop control
@@ -1163,6 +1164,8 @@ template<
 
         // Applies all pending changes.
         virtual void scheduled_apply() {
+            looping_driver_t driver;
+
             if (n_modified > 0) {
                 if (has_debug_contraction) {
                     for (unsigned i = 0; i < vertices.size(); ++i) {
@@ -1174,15 +1177,14 @@ template<
                         col.children_count = col.scheduled_children_count;
                     }
                 } else {
-                    // TODO: parallel loop
-                    for (unsigned i = 0; i < n_modified; ++i) {
+                    driver.loop_for(0, n_modified, [this](int i) -> void {
                         vertex_col_t &col = vertices[curr_modified[i].data];
                         col.is_changed = false;
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
                         col.right_index = col.scheduled_right_index;
                         col.children_count = col.scheduled_children_count;
-                    }
+                    });
                 }
             }
 
@@ -1204,35 +1206,27 @@ template<
                         }
                     }
                 } else {
-                    // TODO: parallel loop
-                    for (unsigned i = 0; i < n_modified; ++i) {
+                    driver.loop_for(0, n_modified, [this, level](int i) -> void {
                         process_vertex(level, curr_modified[i].data);
-                    }
+                    });
                 }
-                // TODO: parallel loop
-                for (unsigned i = 0; i < n_modified; ++i) {
+                driver.loop_for(0, n_modified, [this, level](int i) -> void {
                     fetch_parent_uniquify_vertices(level + 1, curr_modified[i].data);
-                }
-                // TODO: make it an (inclusive) parallel prefix sum
-                for (unsigned i = 0; i < n_modified; ++i) {
-                    vertex_col_t &curr_v = vertices[curr_modified[i].data];
-                    if (i == 0) {
-                        curr_v.next_affected_prefix_sum = curr_v.next_affected_count;
-                    } else {
-                        vertex_col_t &prev_v = vertices[curr_modified[i - 1].data];
-                        curr_v.next_affected_prefix_sum = prev_v.next_affected_prefix_sum + curr_v.next_affected_count;
-                    }
-                }
+                });
+                driver.compute_prefix_sum(0, n_modified, [this](int i) -> int & {
+                    return vertices[curr_modified[i].data].next_affected_count;
+                }, [this](int i) -> int & {
+                    return vertices[curr_modified[i].data].next_affected_prefix_sum;
+                });
                 unsigned new_n_modified = vertices[curr_modified[n_modified - 1].data].next_affected_prefix_sum;
-                // TODO: parallel loop
-                for (unsigned i = 0; i < n_modified; ++i) {
+                driver.loop_for(0, n_modified, [this](int i) -> void {
                     vertex_col_t &vx = vertices[curr_modified[i].data];
                     int offset = vx.next_affected_prefix_sum - vx.next_affected_count;
                     for (int j = 0; j < vx.next_affected_count; ++j) {
                         next_modified[j + offset].data = vx.next_affected[j];
                         atomic_flags[vx.next_affected[j]].clear();
                     }
-                }
+                });
                 n_modified = new_n_modified;
             }
             edge_count = scheduled_edge_count;
@@ -1242,18 +1236,18 @@ template<
 
         // Cancels all pending changes.
         virtual void scheduled_cancel() {
+            looping_driver_t driver;
             scheduled_edge_count = edge_count;
             conn_checker.unroll();
             has_scheduled = false;
-            // TODO: maybe also a parallel loop?
-            for (unsigned i = 0; i < n_modified; ++i) {
+            driver.loop_for(0, n_modified, [this](int i) -> void {
                 vertex_col_t &col = vertices[curr_modified[i].data];
                 col.is_changed = false;
                 col.at_level(0) = col.at_level(1);
                 col.scheduled_left_index = col.left_index;
                 col.scheduled_right_index = col.right_index;
                 col.scheduled_children_count = col.children_count;
-            }
+            });
             n_modified = 0;
         }
 
