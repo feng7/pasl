@@ -49,7 +49,11 @@ elif [[ "$1" == "perf" ]]; then
         thread_local_random.cpp \
         looping_driver_seq.cpp looping_driver_openmp.cpp
 
-    ./main
+    if [[ "$2" == "" ]]; then
+        ./main
+    else
+        OMP_NUM_THREADS=$2 ./main
+    fi
     rm main
 
 elif [[ "$1" == "prof" ]]; then
