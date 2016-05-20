@@ -17,7 +17,7 @@ USE_MATH=1
 ####################################################################
 # Default options
 
-USE_ALLOCATOR=
+USE_ALLOCATOR=tcmalloc
 USE_HWLOC=0
 USE_NUMA=0
 
