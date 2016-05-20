@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 
+#include <sys/time.h>
+
 #include "rooted_dynforest.hpp"
 #include "rooted_rcforest.hpp"
 #include "looping_driver_seq.hpp"
@@ -18,10 +20,22 @@ using std::string;
 
 template<typename int_forest>
 void timed_scheduled_apply(int_forest &forest) {
-    clock_t start_time = clock();
+    clock_t start_clock = clock();
+    timeval start_time;
+    gettimeofday(&start_time, 0);
+
     forest.scheduled_apply();
-    clock_t end_time = clock();
-    cout << "    scheduled_apply: " << ((double) (end_time - start_time) / CLOCKS_PER_SEC) << " sec" << endl;
+
+    clock_t end_clock = clock();
+    timeval end_time;
+    gettimeofday(&end_time, 0);
+
+    double wall_time = (end_time.tv_sec + 1e-6 * end_time.tv_usec) - (start_time.tv_sec + 1e-6 * start_time.tv_usec);
+    double proc_time = (double) (end_clock - start_clock) / CLOCKS_PER_SEC;
+    cout << "    scheduled_apply: all-thread = "
+         << proc_time << " sec, wall-clock = "
+         << wall_time << " sec, ratio = "
+         << proc_time / wall_time << "." << endl;
 }
 
 template<typename int_forest>

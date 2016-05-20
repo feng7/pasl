@@ -43,7 +43,7 @@ if [[ "$1" == "test" ]]; then
 
 elif [[ "$1" == "perf" ]]; then
 
-    g++ -std=c++11 -O3 -Wall -Wextra -fopenmp -o main \
+    g++ -std=c++11 -O3 -Wall -Wextra -fopenmp -ltcmalloc -o main \
         dynamic_connectivity.cpp \
         sequential_timing.cpp \
         thread_local_random.cpp \
@@ -54,7 +54,7 @@ elif [[ "$1" == "perf" ]]; then
 
 elif [[ "$1" == "prof" ]]; then
 
-    g++ -std=c++11 -pg -O3 -Wall -Wextra -fopenmp -o main \
+    g++ -std=c++11 -pg -O3 -Wall -Wextra -fopenmp -ltcmalloc -o main \
         dynamic_connectivity.cpp \
         sequential_timing.cpp \
         thread_local_random.cpp \
