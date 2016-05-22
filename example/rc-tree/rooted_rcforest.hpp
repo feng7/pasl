@@ -106,6 +106,28 @@ template<
             }
         };
 
+        struct atomic_flag {
+        private:
+            std::atomic_flag data;
+        public:
+            atomic_flag() : data() {
+                data.clear();
+            }
+            atomic_flag(atomic_flag const &): data() {
+                data.clear();
+            }
+            atomic_flag &operator = (atomic_flag const &) {
+                data.clear();
+                return *this;
+            }
+            bool test_and_set() {
+                return data.test_and_set();
+            }
+            void clear() {
+                data.clear();
+            }
+        };
+
         // The private struct - don't need to test the public methods!
         struct vertex_col_t {
         private:
@@ -129,6 +151,9 @@ template<
             int scheduled_left_index;
             int scheduled_right_index;
             int heap_key;
+
+            // The atomic flag wrapper.
+            atomic_flag flag;
 
             // Random bits for determining whether to compress
             std::vector<unsigned> random_bits;
@@ -197,76 +222,6 @@ template<
             }
         };
 
-        static constexpr int cache_line_size_in_bytes = 8;
-        static constexpr int ints_in_cache_line = cache_line_size_in_bytes / sizeof(int);
-        static constexpr int flags_in_cache_line = cache_line_size_in_bytes / sizeof(std::atomic_flag);
-
-        struct cache_line_int_t {
-            int data;
-        private:
-            int padding[ints_in_cache_line - 1];
-        };
-
-        class atomic_flag_vector {
-            std::atomic_flag *data;
-            unsigned count, capacity;
-
-            void reset() {
-                for (unsigned i = 0; i < capacity; ++i) {
-                    data[i].clear();
-                }
-            }
-        public:
-            atomic_flag_vector()
-                : data(new std::atomic_flag[10 * flags_in_cache_line])
-                , count(0)
-                , capacity(10 * flags_in_cache_line)
-            {
-                reset();
-            }
-
-            atomic_flag_vector(atomic_flag_vector const &that)
-                : data(new std::atomic_flag[that.capacity])
-                , count(that.count)
-                , capacity(that.capacity)
-            {
-                reset();
-            }
-
-            atomic_flag_vector &operator = (atomic_flag_vector const &that) {
-                if (capacity < that.capacity) {
-                    delete[] data;
-                    capacity = that.capacity;
-                    data = new std::atomic_flag[capacity];
-                    reset();
-                }
-                count = that.count;
-                return *this;
-            }
-
-            std::atomic_flag &operator[] (unsigned index) {
-                return data[index * flags_in_cache_line];
-            }
-
-            unsigned size() const {
-                return count;
-            }
-
-            void insert_element() {
-                while (count * flags_in_cache_line >= capacity) {
-                    delete[] data;
-                    capacity *= 2;
-                    data = new std::atomic_flag[capacity];
-                    reset();
-                }
-                ++count;
-            }
-
-            ~atomic_flag_vector() {
-                delete[] data;
-            }
-        };
-
         e_monoid_trait  e_ops;
         v_monoid_trait  v_ops;
 
@@ -278,9 +233,8 @@ template<
 
         connectivity_t conn_checker;
 
-        atomic_flag_vector atomic_flags;
-        std::vector<cache_line_int_t> curr_modified;
-        std::vector<cache_line_int_t> next_modified;
+        std::vector<int> curr_modified;
+        std::vector<int> next_modified;
         unsigned n_modified;
 
     // Constructors
@@ -295,7 +249,6 @@ template<
           , has_scheduled(false)
           , vertices()
           , conn_checker()
-          , atomic_flags()
           , curr_modified()
           , next_modified()
           , n_modified(0)
@@ -310,7 +263,6 @@ template<
           , has_scheduled(src.has_scheduled)
           , vertices(src.vertices)
           , conn_checker(src.conn_checker)
-          , atomic_flags(src.atomic_flags)
           , curr_modified(src.curr_modified)
           , next_modified(src.next_modified)
           , n_modified(src.n_modified)
@@ -326,7 +278,6 @@ template<
             has_scheduled        = src.has_scheduled;
             vertices             = src.vertices;
             conn_checker         = src.conn_checker;
-            atomic_flags         = src.atomic_flags;
             curr_modified        = src.curr_modified;
             next_modified        = src.next_modified;
             n_modified           = src.n_modified;
@@ -600,13 +551,10 @@ template<
 
             conn_checker.create_vertex();
 
-            atomic_flags.insert_element();
-            atomic_flags.insert_element();
-
-            curr_modified.push_back(cache_line_int_t());
-            curr_modified.push_back(cache_line_int_t());
-            next_modified.push_back(cache_line_int_t());
-            next_modified.push_back(cache_line_int_t());
+            curr_modified.push_back(0);
+            curr_modified.push_back(0);
+            next_modified.push_back(0);
+            next_modified.push_back(0);
 
             return data_index / 2;
         }
@@ -628,7 +576,7 @@ template<
             ensure_has_scheduled();
             vertex_col_t &vx = vertices[vertex];
             if (!vx.is_changed) {
-                curr_modified[n_modified++].data = vertex;
+                curr_modified[n_modified++] = vertex;
                 vx.is_changed = true;
                 vx.at_level(0) = vx.at_level(1);
                 vx.scheduled_left_index = vx.left_index;
@@ -1047,7 +995,7 @@ template<
             int affected_count = vx.next_affected_count;
             vx.next_affected_count = 0;
             for (int i = 0; i < affected_count; ++i) {
-                if (!atomic_flags[vx.next_affected[i]].test_and_set()) {
+                if (!vertices[vx.next_affected[i]].flag.test_and_set()) {
                     // This vertex was not claimed by anyone else
                     vx.next_affected[vx.next_affected_count++] = vx.next_affected[i];
                 }
@@ -1195,7 +1143,7 @@ template<
                     });
                 } else {
                     driver.loop_for(0, n_modified, [this](int i) -> void {
-                        vertex_col_t &col = vertices[curr_modified[i].data];
+                        vertex_col_t &col = vertices[curr_modified[i]];
                         col.is_changed = false;
                         col.at_level(1) = col.at_level(0);
                         col.left_index = col.scheduled_left_index;
@@ -1218,7 +1166,7 @@ template<
                 if (has_debug_contraction) {
                     std::vector<unsigned> curr_affected;
                     for (unsigned i = 0; i < n_modified; ++i) {
-                        curr_affected.push_back(curr_modified[i].data);
+                        curr_affected.push_back(curr_modified[i]);
                     }
                     std::sort(curr_affected.begin(), curr_affected.end());
                     driver.loop_for(0, vertices.size(), [this, level, curr_affected](int i) -> void {
@@ -1232,7 +1180,7 @@ template<
                     });
                 } else {
                     driver.loop_for(0, n_modified, [this, level](int i) -> void {
-                        process_vertex(level, curr_modified[i].data);
+                        process_vertex(level, curr_modified[i]);
                     });
                 }
 
@@ -1241,7 +1189,7 @@ template<
                 #endif
 
                 driver.loop_for(0, n_modified, [this, level](int i) -> void {
-                    fetch_parent_uniquify_vertices(level + 1, curr_modified[i].data);
+                    fetch_parent_uniquify_vertices(level + 1, curr_modified[i]);
                 });
 
                 #ifdef SCHEDULED_APPLY_LOGGING
@@ -1249,22 +1197,22 @@ template<
                 #endif
 
                 driver.compute_prefix_sum(0, n_modified, [this](int i) -> int & {
-                    return vertices[curr_modified[i].data].next_affected_count;
+                    return vertices[curr_modified[i]].next_affected_count;
                 }, [this](int i) -> int & {
-                    return vertices[curr_modified[i].data].next_affected_prefix_sum;
+                    return vertices[curr_modified[i]].next_affected_prefix_sum;
                 });
 
                 #ifdef SCHEDULED_APPLY_LOGGING
                 clock_t clock_phase_sum = clock();
                 #endif
 
-                unsigned new_n_modified = vertices[curr_modified[n_modified - 1].data].next_affected_prefix_sum;
+                unsigned new_n_modified = vertices[curr_modified[n_modified - 1]].next_affected_prefix_sum;
                 driver.loop_for(0, n_modified, [this](int i) -> void {
-                    vertex_col_t &vx = vertices[curr_modified[i].data];
+                    vertex_col_t &vx = vertices[curr_modified[i]];
                     int offset = vx.next_affected_prefix_sum - vx.next_affected_count;
                     for (int j = 0; j < vx.next_affected_count; ++j) {
-                        next_modified[j + offset].data = vx.next_affected[j];
-                        atomic_flags[vx.next_affected[j]].clear();
+                        next_modified[j + offset] = vx.next_affected[j];
+                        vertices[vx.next_affected[j]].flag.clear();
                     }
                 });
                 n_modified = new_n_modified;
@@ -1292,7 +1240,7 @@ template<
             conn_checker.unroll();
             has_scheduled = false;
             driver.loop_for(0, n_modified, [this](int i) -> void {
-                vertex_col_t &col = vertices[curr_modified[i].data];
+                vertex_col_t &col = vertices[curr_modified[i]];
                 col.is_changed = false;
                 col.at_level(0) = col.at_level(1);
                 col.scheduled_left_index = col.left_index;
