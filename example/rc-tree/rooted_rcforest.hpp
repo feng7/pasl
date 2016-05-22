@@ -167,12 +167,16 @@ template<
 
             bool is_changed;
 
-            bool get_random_bit(int level) {
+            void ensure_enough_random_bits(int level) {
                 int v_index = level / bits_in_unsigned;
-                int b_index = level % bits_in_unsigned;
                 while ((int) random_bits.size() <= v_index) {
                     random_bits.push_back((unsigned) global_rng());
                 }
+            }
+
+            bool get_random_bit(int level) {
+                int v_index = level / bits_in_unsigned;
+                int b_index = level % bits_in_unsigned;
                 return ((random_bits[v_index] >> b_index) & 1) == 1;
             }
 
@@ -546,8 +550,8 @@ template<
             data_col.at_level(0).parent = link_index;
             data_col.at_level(1).parent = link_index;
 
-            data_col.get_random_bit(1);
-            link_col.get_random_bit(2);
+            data_col.ensure_enough_random_bits(1);
+            link_col.ensure_enough_random_bits(2);
 
             conn_checker.create_vertex();
 
@@ -839,10 +843,10 @@ template<
             vertex_t const &v = vertices[vertex].at_level(level);
             return v.children_count == 1
                 && v.parent != -1
+                && !will_rake(level, v.children[0])
                 && !vertices[vertex].get_random_bit(level)
                 && vertices[v.parent].get_random_bit(level)
-                && vertices[v.children[0]].get_random_bit(level)
-                && !will_rake(level, v.children[0]);
+                && vertices[v.children[0]].get_random_bit(level);
         }
         bool will_accept_change(int level, int vertex) {
             vertex_t const &v = vertices[vertex].at_level(level);
@@ -850,6 +854,8 @@ template<
                 if (will_rake(level, v.children[i])) {
                     return true;
                 }
+            }
+            for (int i = v.children_count - 1; i >= 0; --i) {
                 if (will_compress(level, v.children[i])) {
                     return true;
                 }
@@ -984,7 +990,7 @@ template<
 
         void fetch_parent_uniquify_vertices(int level, int vertex) {
             vertex_col_t &vx = vertices[vertex];
-            vx.get_random_bit(level);
+            vx.ensure_enough_random_bits(level);
             if (vx.next_affected_check_parent != -1) {
                 int child = vx.next_affected[vx.next_affected_check_parent];
                 int parent = vertices[child].at_level(level).parent;
