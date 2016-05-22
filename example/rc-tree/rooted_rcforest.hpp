@@ -197,10 +197,14 @@ template<
             }
         };
 
+        static constexpr int cache_line_size_in_bytes = 8;
+        static constexpr int ints_in_cache_line = cache_line_size_in_bytes / sizeof(int);
+        static constexpr int flags_in_cache_line = cache_line_size_in_bytes / sizeof(std::atomic_flag);
+
         struct cache_line_int_t {
             int data;
         private:
-            int padding;
+            int padding[ints_in_cache_line - 1];
         };
 
         class atomic_flag_vector {
@@ -214,9 +218,9 @@ template<
             }
         public:
             atomic_flag_vector()
-                : data(new std::atomic_flag[10])
+                : data(new std::atomic_flag[10 * flags_in_cache_line])
                 , count(0)
-                , capacity(10)
+                , capacity(10 * flags_in_cache_line)
             {
                 reset();
             }
@@ -241,7 +245,7 @@ template<
             }
 
             std::atomic_flag &operator[] (unsigned index) {
-                return data[index];
+                return data[index * flags_in_cache_line];
             }
 
             unsigned size() const {
@@ -249,7 +253,7 @@ template<
             }
 
             void insert_element() {
-                if (count == capacity) {
+                while (count * flags_in_cache_line >= capacity) {
                     delete[] data;
                     capacity *= 2;
                     data = new std::atomic_flag[capacity];

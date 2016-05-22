@@ -167,9 +167,9 @@ void incremental_long_chain(int size) {
 }
 
 void timing(string name, function<void(int)> callee) {
-    int sizes[] = {100, 1000, 10000, 100000, 1000000};
+    int sizes[] = {10000, 100000, 1000000, 3000000};
 
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 4; ++i) {
         cout << name << ": " << sizes[i] << " => " << endl;
 
         clock_t start_time = clock();
