@@ -46,6 +46,7 @@ void long_chain(int size) {
         forest.scheduled_attach(i - 1, i, 1, 1);
     }
     timed_scheduled_apply(forest);
+    #ifdef CHECK_RESULTS
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
@@ -56,6 +57,7 @@ void long_chain(int size) {
             throw std::logic_error("Wrong result (get_subtree)");
         }
     }
+    #endif
 }
 
 template<typename int_forest>
@@ -68,6 +70,7 @@ void large_degree(int size) {
         forest.scheduled_attach(0, i, 1, 1);
     }
     timed_scheduled_apply(forest);
+    #ifdef CHECK_RESULTS
     for (int i = 0; i < size; ++i) {
         int source = ((i * 3214 + 9132) % size + size) % size;
         int target = ((i * 26466 + 913532) % size + size) % size;
@@ -86,6 +89,7 @@ void large_degree(int size) {
             throw std::logic_error("Wrong result (get_subtree)");
         }
     }
+    #endif
 }
 
 template<typename int_forest>
@@ -103,6 +107,7 @@ void two_large_degrees(int size) {
     forest.scheduled_attach(0, half_size, 3, 3);
     timed_scheduled_apply(forest);
 
+    #ifdef CHECK_RESULTS
     int expected_path[][4] = {
         { 0, 3, 1, 5 },
         { 3, 0, 4, 2 },
@@ -122,6 +127,7 @@ void two_large_degrees(int size) {
             throw std::logic_error("Wrong result (get_path)");
         }
     }
+    #endif
 }
 
 template<typename int_forest>
@@ -144,6 +150,7 @@ void incremental_long_chain(int size) {
 
         timed_scheduled_apply(forest);
 
+        #ifdef CHECK_RESULTS
         int actual_size = forest.n_vertices();
         for (int i = 0; i < actual_size; ++i) {
             int source = ((i * 3214 + 9132) % actual_size + actual_size) % actual_size;
@@ -155,6 +162,7 @@ void incremental_long_chain(int size) {
                 throw std::logic_error("Wrong result (get_subtree)");
             }
         }
+        #endif
     }
 }
 

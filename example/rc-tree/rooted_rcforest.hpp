@@ -14,6 +14,11 @@
 #include "dynamic_connectivity.hpp"
 #include "thread_local_random.hpp"
 
+#ifdef SCHEDULED_APPLY_LOGGING
+#include <ctime>
+#include <iostream>
+#endif
+
 // An implementation of the rooted dynamic forest based on RC-trees.
 template<
     typename e_info_t,
@@ -1170,6 +1175,10 @@ template<
         virtual void scheduled_apply() {
             looping_driver_t driver;
 
+            #ifdef SCHEDULED_APPLY_LOGGING
+            clock_t clock_init = clock();
+            #endif
+
             if (n_modified > 0) {
                 if (has_debug_contraction) {
                     driver.loop_for(0, vertices.size(), [this](int i) -> void {
@@ -1192,7 +1201,16 @@ template<
                 }
             }
 
+            #ifdef SCHEDULED_APPLY_LOGGING
+            clock_t clock_zero = clock();
+            std::cout << "    phase 0: " << clock_zero - clock_init << std::endl;
+            #endif
+
             for (int level = 1; n_modified > 0; ++level, std::swap(curr_modified, next_modified)) {
+                #ifdef SCHEDULED_APPLY_LOGGING
+                clock_t clock_phase_start = clock();
+                #endif
+
                 if (has_debug_contraction) {
                     std::vector<unsigned> curr_affected;
                     for (unsigned i = 0; i < n_modified; ++i) {
@@ -1213,14 +1231,29 @@ template<
                         process_vertex(level, curr_modified[i].data);
                     });
                 }
+
+                #ifdef SCHEDULED_APPLY_LOGGING
+                clock_t clock_phase_assign = clock();
+                #endif
+
                 driver.loop_for(0, n_modified, [this, level](int i) -> void {
                     fetch_parent_uniquify_vertices(level + 1, curr_modified[i].data);
                 });
+
+                #ifdef SCHEDULED_APPLY_LOGGING
+                clock_t clock_phase_uniq = clock();
+                #endif
+
                 driver.compute_prefix_sum(0, n_modified, [this](int i) -> int & {
                     return vertices[curr_modified[i].data].next_affected_count;
                 }, [this](int i) -> int & {
                     return vertices[curr_modified[i].data].next_affected_prefix_sum;
                 });
+
+                #ifdef SCHEDULED_APPLY_LOGGING
+                clock_t clock_phase_sum = clock();
+                #endif
+
                 unsigned new_n_modified = vertices[curr_modified[n_modified - 1].data].next_affected_prefix_sum;
                 driver.loop_for(0, n_modified, [this](int i) -> void {
                     vertex_col_t &vx = vertices[curr_modified[i].data];
@@ -1231,6 +1264,17 @@ template<
                     }
                 });
                 n_modified = new_n_modified;
+
+                #ifdef SCHEDULED_APPLY_LOGGING
+                clock_t clock_phase_end = clock();
+
+                std::cout << "    phase " << level
+                          << ": assign " << clock_phase_assign - clock_phase_start
+                          << ", uniq " << clock_phase_uniq - clock_phase_assign
+                          << ", sum " << clock_phase_sum - clock_phase_uniq
+                          << ", newlevel " << clock_phase_end - clock_phase_sum
+                          << std::endl;
+                #endif
             }
             edge_count = scheduled_edge_count;
             conn_checker.flush();
