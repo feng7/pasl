@@ -3,14 +3,14 @@
 #include <functional>
 
 void looping_driver_openmp::loop_for(int from, int until, std::function<void(int)> function) {
-    #pragma omp parallel for schedule(guided, 100)
+    #pragma omp parallel for schedule(static)
     for (int i = from; i < until; ++i) {
         function(i);
     }
 }
 
 void looping_driver_openmp::compute_prefix_sum(int from, int until, std::function<int&(int)> value, std::function<int&(int)> result) {
-    #pragma omp parallel if (until - from > 100)
+    #pragma omp parallel if (until - from >= 100 * omp_get_max_threads())
     {
         int thread_my = omp_get_thread_num();
         int thread_count = omp_get_num_threads();
