@@ -67,24 +67,23 @@ elif [[ "$1" == "perf" ]]; then
         timing_$2.cpp
 
     if [[ "$3" == "" ]]; then
-        LD_PRELOAD=$TCMALLOC_TEST_PRELOAD ./main
+        LD_PRELOAD=$TCMALLOC_TEST_PRELOAD OMP_WAIT_POLICY=PASSIVE ./main
     else
-        OMP_NUM_THREADS=$3 LD_PRELOAD=$TCMALLOC_TEST_PRELOAD ./main
+        OMP_NUM_THREADS=$3 LD_PRELOAD=$TCMALLOC_TEST_PRELOAD OMP_WAIT_POLICY=PASSIVE ./main
     fi
     rm main
 
 elif [[ "$1" == "grind" ]]; then
 
-
-    try_compiling_with_tcmalloc \
+    try_compiling_with_tcmalloc -g \
         dynamic_connectivity.cpp \
         thread_local_random.cpp \
         timing_$2.cpp
 
     if [[ "$3" == "" ]]; then
-        LD_PRELOAD=$TCMALLOC_TEST_PRELOAD valgrind --tool=callgrind --cache-sim=yes ./main
+        LD_PRELOAD=$TCMALLOC_TEST_PRELOAD OMP_WAIT_POLICY=PASSIVE valgrind --tool=callgrind --cache-sim=yes ./main
     else
-        OMP_NUM_THREADS=$3 LD_PRELOAD=$TCMALLOC_TEST_PRELOAD valgrind --tool=callgrind --cache-sim=yes ./main
+        OMP_NUM_THREADS=$3 LD_PRELOAD=$TCMALLOC_TEST_PRELOAD OMP_WAIT_POLICY=PASSIVE valgrind --tool=callgrind --cache-sim=yes ./main
     fi
     rm main
 
