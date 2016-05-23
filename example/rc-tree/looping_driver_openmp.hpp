@@ -15,7 +15,7 @@ struct looping_driver_openmp {
 
     template<typename value_fun, typename result_fun>
     void compute_prefix_sum(int from, int until, value_fun const &value, result_fun const &result) {
-        #pragma omp parallel if (until - from >= 100 * omp_get_max_threads())
+        #pragma omp parallel
         {
             int thread_my = omp_get_thread_num();
             int thread_count = omp_get_num_threads();
