@@ -4,8 +4,19 @@
 #include <functional>
 
 struct looping_driver_seq {
-    void loop_for(int from, int until, std::function<void(int)> function);
-    void compute_prefix_sum(int from, int until, std::function<int&(int)> value, std::function<int&(int)> result);
+    template<typename loop_body>
+    void loop_for(int from, int until, loop_body const &function) {
+        for (int i = from; i < until; ++i) {
+            function(i);
+        }
+    }
+    template<typename value_fun, typename result_fun>
+    void compute_prefix_sum(int from, int until, value_fun const &value, result_fun const &result) {
+        result(from) = value(from);
+        for (int i = from + 1; i < until; ++i) {
+            result(i) = result(i - 1) + value(i);
+        }
+    }
 };
 
 #endif

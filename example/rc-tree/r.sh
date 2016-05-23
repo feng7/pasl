@@ -16,8 +16,7 @@ if [[ "$1" == "test" ]]; then
     g++ -std=c++11 -O3 -Wall -Wextra -fopenmp -o main \
         rooted_dynforest_test.cpp \
         dynamic_connectivity.cpp \
-        thread_local_random.cpp \
-        looping_driver_seq.cpp looping_driver_openmp.cpp
+        thread_local_random.cpp
 
     ./main
     EXITCODE=$?
@@ -30,8 +29,7 @@ if [[ "$1" == "test" ]]; then
     g++ -std=c++11 -O3 -Wall -Wextra -fopenmp -o main \
         stress_test.cpp \
         dynamic_connectivity.cpp \
-        thread_local_random.cpp \
-        looping_driver_seq.cpp looping_driver_openmp.cpp
+        thread_local_random.cpp
 
     ./main
     EXITCODE=$?
@@ -46,7 +44,7 @@ elif [[ "$1" == "perf" ]]; then
     g++ -std=c++11 -O3 -Wall -Wextra -fopenmp -ltcmalloc -o main \
         dynamic_connectivity.cpp \
         thread_local_random.cpp \
-        looping_driver_$2.cpp timing_$2.cpp
+        timing_$2.cpp
 
     if [[ "$3" == "" ]]; then
         ./main
