@@ -10,7 +10,7 @@ struct looping_driver_pasl {
         pasl::sched::native::parallel_for(from, until, function);
     }
     template<typename value_fun, typename result_fun>
-    void compute_prefix_sum(int from, int until, std::function<int&(int)> value, std::function<int&(int)> result) {
+    void compute_prefix_sum(int from, int until, value_fun const &value, result_fun const &result) {
         int jump = 1;
         while (jump < until - from) {
             pasl::sched::native::parallel_for(0, (until - from + jump - 1) / (2 * jump), [from, value, jump] (int j) -> void {
